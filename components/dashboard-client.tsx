@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { Upload, TrendingUp, TrendingDown, AlertTriangle, Sparkles, Package, IndianRupee, BarChart3, FileText, Download, RefreshCcw, Settings, Search, CheckCircle2, XCircle, Target, Percent, Truck, ReceiptIndianRupee, Save, Brain } from "lucide-react";
+import { Upload, TrendingUp, TrendingDown, AlertTriangle, Sparkles, Package, IndianRupee, BarChart3, FileText, Download, RefreshCcw, Settings as SettingsIcon, Search, CheckCircle2, XCircle, Target, Percent, Truck, ReceiptIndianRupee, Save, Brain } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
@@ -252,7 +252,7 @@ export function DashboardClient({ initialReports, userPlan }: { initialReports: 
 
       <Card>
         <CardContent>
-          <h2 className="flex items-center gap-2 text-lg font-bold"><Settings className="h-5 w-5" /> Business Settings</h2>
+          <h2 className="flex items-center gap-2 text-lg font-bold"><SettingsIcon className="h-5 w-5" /> Business Settings</h2>
           <div className="mt-4 grid gap-4 md:grid-cols-4">
             <NumberInput label="Target Margin %" value={settings.targetMargin} onChange={(value: number) => setSettings((s) => ({ ...s, targetMargin: value }))} icon={<Target />} />
             <NumberInput label="High Return Alert %" value={settings.highReturnThreshold} onChange={(value: number) => setSettings((s) => ({ ...s, highReturnThreshold: value }))} icon={<Percent />} />
