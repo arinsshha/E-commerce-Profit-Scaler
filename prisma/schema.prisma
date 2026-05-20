@@ -1,0 +1,55 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Plan {
+  FREE
+  STARTER
+  GROWTH
+  PRO
+}
+
+enum SubscriptionStatus {
+  NONE
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+model User {
+  id                 String             @id @default(cuid())
+  clerkId            String             @unique
+  email              String?
+  name               String?
+  plan               Plan               @default(FREE)
+  subscriptionStatus SubscriptionStatus @default(NONE)
+  stripeCustomerId   String?
+  razorpayCustomerId String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  reports            Report[]
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  settings    Json
+  orders      Json
+  costs       Json
+  ads         Json
+  shipping    Json
+  returns     Json
+  analysis    Json
+  aiSummary   Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
