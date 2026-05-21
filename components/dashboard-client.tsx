@@ -861,9 +861,7 @@ function NumberInput({
   return (
     <label className="block">
       <span className="mb-1 flex items-center gap-1 text-xs font-medium text-gray-600">
-        {React.cloneElement(icon, {
-          className: "h-3 w-3",
-        })}
+        <span className="w-3 h-3">{icon}</span>
         {label}
       </span>
 
@@ -896,9 +894,7 @@ function MetricCard({
       <CardContent className="p-5">
         <div className="flex items-start justify-between">
           <div className="rounded-2xl bg-gray-100 p-3">
-            {React.cloneElement(icon, {
-              className: "h-5 w-5",
-            })}
+            <span className="w-5 h-5">{icon}</span>
           </div>
 
           {positive !== undefined &&
