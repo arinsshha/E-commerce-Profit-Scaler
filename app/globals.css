@@ -27,3 +27,36 @@ textarea {
   background: #10b981;
   color: white;
 }
+@media print {
+  body {
+    background: white !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-section,
+  .print-section * {
+    visibility: visible;
+  }
+
+  .print-section {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white;
+  }
+
+  .print-section .shadow-sm {
+    box-shadow: none !important;
+  }
+
+  button,
+  input,
+  textarea,
+  select {
+    display: none !important;
+  }
+}

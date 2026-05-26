@@ -612,6 +612,14 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
                 <Button className="rounded-2xl bg-slate-900 text-white hover:bg-slate-800" onClick={saveReport} disabled={saving}>
                   <FileText className="w-4 h-4 mr-2" /> {saving ? "Saving..." : "Save Report"}
                 </Button>
+                <Button
+  variant="outline"
+  className="rounded-2xl border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+  onClick={() => window.print()}
+>
+  <FileText className="mr-2 h-4 w-4" />
+  Export PDF
+</Button>
               </div>
             </div>
 
@@ -1166,5 +1174,57 @@ function SmallList({ title, items, empty, kind, settings }) {
         )}
       </CardContent>
     </Card>
+    
   );
+  function ReportMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div className="rounded-3xl bg-slate-50 p-5">
+      <p className="text-sm text-slate-500">{label}</p>
+      <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function ReportList({
+  title,
+  items,
+  empty,
+  valueLabel,
+  valueGetter,
+}: {
+  title: string;
+  items: any[];
+  empty: string;
+  valueLabel: string;
+  valueGetter: (item: any) => string;
+}) {
+  return (
+    <div className="rounded-3xl bg-slate-50 p-5">
+      <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+
+      {items.length === 0 ? (
+        <p className="mt-3 text-sm text-slate-500">{empty}</p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {items.slice(0, 5).map((item: any) => (
+            <div key={item.sku} className="rounded-2xl bg-white p-3 text-sm">
+              <p className="font-semibold text-slate-900">{item.product}</p>
+              <p className="mt-1 text-xs text-slate-500">{item.sku}</p>
+              <p className="mt-2 text-slate-700">
+                {valueLabel}:{" "}
+                <span className="font-semibold">{valueGetter(item)}</span>
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 }
