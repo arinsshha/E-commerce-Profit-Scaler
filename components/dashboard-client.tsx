@@ -219,53 +219,63 @@ function getValueFromPossibleColumns(row: any, possibleColumns: string[]) {
   return "";
 }
 
-function mapShopifyOrdersCsv(rows: any[]) {
+function mapWooCommerceOrdersCsv(rows: any[]) {
   return rows
     .map((row, index) => {
       const orderId =
-        getValueFromPossibleColumns(row, ["Name", "Order Name", "Order ID", "Order Number"]) ||
-        `SHOPIFY-${index + 1}`;
+        getValueFromPossibleColumns(row, [
+          "Order ID",
+          "Order Number",
+          "ID",
+          "Order",
+          "Order Number",
+        ]) || `WOO-${index + 1}`;
 
       const date =
-        getValueFromPossibleColumns(row, ["Created at", "Created At", "Date", "Paid at"]) ||
-        "";
+        getValueFromPossibleColumns(row, [
+          "Date",
+          "Date Created",
+          "Order Date",
+          "Created Date",
+        ]) || "";
 
       const product =
         getValueFromPossibleColumns(row, [
-          "Lineitem name",
-          "Line Item Name",
-          "Product",
           "Product Name",
-          "Title",
+          "Product",
+          "Item Name",
+          "Name",
+          "Line Item Name",
         ]) || "Unknown Product";
 
       const sku =
         getValueFromPossibleColumns(row, [
-          "Lineitem sku",
-          "Line Item SKU",
-          "Variant SKU",
           "SKU",
+          "Product SKU",
+          "Item SKU",
+          "Line Item SKU",
         ]) || "";
 
       const quantity =
         Number(
           getValueFromPossibleColumns(row, [
-            "Lineitem quantity",
-            "Line Item Quantity",
             "Quantity",
             "Qty",
+            "Item Quantity",
+            "Line Item Quantity",
           ]) || 1
         ) || 1;
 
       const sellingPrice =
         Number(
           getValueFromPossibleColumns(row, [
-            "Lineitem price",
-            "Line Item Price",
-            "Price",
-            "Variant Price",
-            "Subtotal",
+            "Item Cost",
+            "Item Total",
+            "Product Total",
+            "Line Total",
             "Total",
+            "Subtotal",
+            "Price",
           ]) || 0
         ) || 0;
 
@@ -274,8 +284,8 @@ function mapShopifyOrdersCsv(rows: any[]) {
           getValueFromPossibleColumns(row, [
             "Discount Amount",
             "Discount",
-            "Total Discounts",
-            "Lineitem discount",
+            "Cart Discount",
+            "Order Discount",
           ]) || 0
         ) || 0;
 
@@ -301,34 +311,35 @@ function mapShopifyOrdersCsv(rows: any[]) {
     })
     .filter((row) => row.sku && row.sellingPrice > 0);
 }
-
-function mapShopifyProductCsvToCosts(rows: any[]) {
+function mapWooCommerceProductCsvToCosts(rows: any[]) {
   return rows
     .map((row) => {
       const sku =
         getValueFromPossibleColumns(row, [
-          "Variant SKU",
           "SKU",
-          "Lineitem sku",
+          "Product SKU",
+          "Item SKU",
           "Line Item SKU",
         ]) || "";
 
       const product =
         getValueFromPossibleColumns(row, [
-          "Title",
-          "Product",
           "Product Name",
-          "Lineitem name",
-          "Line Item Name",
+          "Product",
+          "Item Name",
+          "Name",
+          "Title",
         ]) || sku;
 
       const productCost =
         Number(
           getValueFromPossibleColumns(row, [
-            "Cost per item",
             "Cost",
+            "Cost per item",
             "Product Cost",
             "COGS",
+            "Purchase Price",
+            "Regular Price",
           ]) || 0
         ) || 0;
 
@@ -367,21 +378,33 @@ function autoMapCsvRows(rows: any[], requiredColumns: string[]) {
   const isCostUpload =
     requiredColumns.includes("productCost");
 
-  if (isOrdersUpload) {
-    const mapped = mapShopifyOrdersCsv(rows);
+ if (isOrdersUpload) {
+  const shopifyMapped = mapShopifyOrdersCsv(rows);
 
-    if (mapped.length > 0) {
-      return mapped;
-    }
+  if (shopifyMapped.length > 0) {
+    return shopifyMapped;
   }
 
-  if (isCostUpload) {
-    const mapped = mapShopifyProductCsvToCosts(rows);
+  const wooMapped = mapWooCommerceOrdersCsv(rows);
 
-    if (mapped.length > 0) {
-      return mapped;
-    }
+  if (wooMapped.length > 0) {
+    return wooMapped;
   }
+}
+
+if (isCostUpload) {
+  const shopifyMapped = mapShopifyProductCsvToCosts(rows);
+
+  if (shopifyMapped.length > 0) {
+    return shopifyMapped;
+  }
+
+  const wooMapped = mapWooCommerceProductCsvToCosts(rows);
+
+  if (wooMapped.length > 0) {
+    return wooMapped;
+  }
+}
 
   return rows;
 }
@@ -1219,7 +1242,7 @@ if (missing.length) {
 }
 
 setError("");
-setSuccess("CSV uploaded and mapped successfully.");
+setSuccess("CSV uploaded successfully. ProfitLens auto-mapped columns when needed.");
 onUpload(mappedRows);
               } catch (err) {
                 setError(err.message || "Could not read CSV file.");
