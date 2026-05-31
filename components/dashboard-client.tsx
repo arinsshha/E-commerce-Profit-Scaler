@@ -194,6 +194,197 @@ function getHealthStatus(product, settings) {
   if (product.returnRate >= settings.highReturnThreshold) return { label: "Return Risk", tone: "bg-orange-100 text-orange-800" };
   return { label: "Healthy", tone: "bg-emerald-100 text-emerald-700" };
 }
+function normalizeColumnName(value: string) {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]/g, "");
+}
+
+function getValueFromPossibleColumns(row: any, possibleColumns: string[]) {
+  const normalizedRow: Record<string, any> = {};
+
+  Object.keys(row || {}).forEach((key) => {
+    normalizedRow[normalizeColumnName(key)] = row[key];
+  });
+
+  for (const column of possibleColumns) {
+    const normalizedColumn = normalizeColumnName(column);
+
+    if (normalizedColumn in normalizedRow) {
+      return normalizedRow[normalizedColumn];
+    }
+  }
+
+  return "";
+}
+
+function mapShopifyOrdersCsv(rows: any[]) {
+  return rows
+    .map((row, index) => {
+      const orderId =
+        getValueFromPossibleColumns(row, ["Name", "Order Name", "Order ID", "Order Number"]) ||
+        `SHOPIFY-${index + 1}`;
+
+      const date =
+        getValueFromPossibleColumns(row, ["Created at", "Created At", "Date", "Paid at"]) ||
+        "";
+
+      const product =
+        getValueFromPossibleColumns(row, [
+          "Lineitem name",
+          "Line Item Name",
+          "Product",
+          "Product Name",
+          "Title",
+        ]) || "Unknown Product";
+
+      const sku =
+        getValueFromPossibleColumns(row, [
+          "Lineitem sku",
+          "Line Item SKU",
+          "Variant SKU",
+          "SKU",
+        ]) || "";
+
+      const quantity =
+        Number(
+          getValueFromPossibleColumns(row, [
+            "Lineitem quantity",
+            "Line Item Quantity",
+            "Quantity",
+            "Qty",
+          ]) || 1
+        ) || 1;
+
+      const sellingPrice =
+        Number(
+          getValueFromPossibleColumns(row, [
+            "Lineitem price",
+            "Line Item Price",
+            "Price",
+            "Variant Price",
+            "Subtotal",
+            "Total",
+          ]) || 0
+        ) || 0;
+
+      const discount =
+        Number(
+          getValueFromPossibleColumns(row, [
+            "Discount Amount",
+            "Discount",
+            "Total Discounts",
+            "Lineitem discount",
+          ]) || 0
+        ) || 0;
+
+      const paymentFee =
+        Number(
+          getValueFromPossibleColumns(row, [
+            "Payment Fee",
+            "Transaction Fee",
+            "Gateway Fee",
+          ]) || 0
+        ) || 0;
+
+      return {
+        orderId,
+        date,
+        product,
+        sku,
+        quantity,
+        sellingPrice,
+        discount,
+        paymentFee,
+      };
+    })
+    .filter((row) => row.sku && row.sellingPrice > 0);
+}
+
+function mapShopifyProductCsvToCosts(rows: any[]) {
+  return rows
+    .map((row) => {
+      const sku =
+        getValueFromPossibleColumns(row, [
+          "Variant SKU",
+          "SKU",
+          "Lineitem sku",
+          "Line Item SKU",
+        ]) || "";
+
+      const product =
+        getValueFromPossibleColumns(row, [
+          "Title",
+          "Product",
+          "Product Name",
+          "Lineitem name",
+          "Line Item Name",
+        ]) || sku;
+
+      const productCost =
+        Number(
+          getValueFromPossibleColumns(row, [
+            "Cost per item",
+            "Cost",
+            "Product Cost",
+            "COGS",
+          ]) || 0
+        ) || 0;
+
+      const packagingCost =
+        Number(
+          getValueFromPossibleColumns(row, [
+            "Packaging Cost",
+            "Packaging",
+          ]) || 0
+        ) || 0;
+
+      return {
+        sku,
+        product,
+        productCost,
+        packagingCost,
+      };
+    })
+    .filter((row) => row.sku);
+}
+
+function autoMapCsvRows(rows: any[], requiredColumns: string[]) {
+  const availableColumns = Object.keys(rows[0] || {});
+  const hasRequiredColumns = requiredColumns.every((column) =>
+    availableColumns.includes(column)
+  );
+
+  if (hasRequiredColumns) {
+    return rows;
+  }
+
+  const isOrdersUpload =
+    requiredColumns.includes("sellingPrice") &&
+    requiredColumns.includes("quantity");
+
+  const isCostUpload =
+    requiredColumns.includes("productCost");
+
+  if (isOrdersUpload) {
+    const mapped = mapShopifyOrdersCsv(rows);
+
+    if (mapped.length > 0) {
+      return mapped;
+    }
+  }
+
+  if (isCostUpload) {
+    const mapped = mapShopifyProductCsvToCosts(rows);
+
+    if (mapped.length > 0) {
+      return mapped;
+    }
+  }
+
+  return rows;
+}
 
 export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {}) {
   const [orders, setOrders] = useState(sampleOrders);
@@ -985,6 +1176,7 @@ function InfoMiniCard({ title, value, subValue, icon, accent }) {
 
 function FileUploader({ title, helper, templateKey, requiredColumns, onUpload, rowsCount }) {
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   return (
     <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-300 hover:bg-emerald-50/40">
@@ -1008,12 +1200,27 @@ function FileUploader({ title, helper, templateKey, requiredColumns, onUpload, r
             reader.onload = () => {
               try {
                 const parsed = parseCSV(String(reader.result));
-                const availableColumns = Object.keys(parsed[0] || {});
-                const missing = requiredColumns.filter((column) => !availableColumns.includes(column));
-                if (!parsed.length) throw new Error("CSV file is empty.");
-                if (missing.length) throw new Error(`Missing columns: ${missing.join(", ")}`);
-                setError("");
-                onUpload(parsed);
+
+if (!parsed.length) {
+  throw new Error("CSV file is empty.");
+}
+
+const mappedRows = autoMapCsvRows(parsed, requiredColumns);
+
+const availableColumns = Object.keys(mappedRows[0] || {});
+const missing = requiredColumns.filter(
+  (column) => !availableColumns.includes(column)
+);
+
+if (missing.length) {
+  throw new Error(
+    `Missing columns: ${missing.join(", ")}. If this is a Shopify file, make sure it contains SKU, quantity, and price columns.`
+  );
+}
+
+setError("");
+setSuccess("CSV uploaded and mapped successfully.");
+onUpload(mappedRows);
               } catch (err) {
                 setError(err.message || "Could not read CSV file.");
               }
@@ -1027,6 +1234,7 @@ function FileUploader({ title, helper, templateKey, requiredColumns, onUpload, r
         </button>
       </div>
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      {success && <p className="mt-2 text-xs text-emerald-600">{success}</p>}
     </div>
   );
 }
