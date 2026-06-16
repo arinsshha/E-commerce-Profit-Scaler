@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import { currentUser } from "@clerk/nextjs/server";
 import {
   ArrowRight,
   BarChart3,
@@ -70,7 +71,14 @@ const packages = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const user = await currentUser();
+  const adminEmail = process.env.ADMIN_EMAIL;
+  const isAdmin = Boolean(
+    adminEmail &&
+      user?.emailAddresses?.some((email) => email.emailAddress === adminEmail)
+  );
+
   return (
     <main className="min-h-screen bg-[#070A12] text-white">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6">
@@ -97,6 +105,11 @@ export default function HomePage() {
           </SignedOut>
 
           <SignedIn>
+            {isAdmin && (
+              <Link href="/admin" className="rounded-full border border-white/15 px-5 py-2 text-sm font-semibold text-white hover:bg-white/10">
+                Admin
+              </Link>
+            )}
             <Link href="/dashboard" className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-black hover:bg-emerald-300">
               Dashboard
             </Link>

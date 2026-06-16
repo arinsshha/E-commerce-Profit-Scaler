@@ -1,4 +1,5 @@
 import { UserButton } from "@clerk/nextjs";
+import Link from "next/link";
 import { requireAppUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { DashboardClient } from "@/components/dashboard-client";
@@ -39,7 +40,17 @@ export default async function DashboardPage() {
             </p>
           </div>
 
-          <UserButton />
+          <div className="flex items-center gap-3">
+            {user.email === process.env.ADMIN_EMAIL && (
+              <Link
+                href="/admin"
+                className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Admin
+              </Link>
+            )}
+            <UserButton />
+          </div>
         </header>
 
         <DashboardClient
