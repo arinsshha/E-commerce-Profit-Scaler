@@ -425,6 +425,7 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
   const [consultantNotes, setConsultantNotes] = useState("");
   const [reports, setReports] = useState(initialReports || []);
   const [saving, setSaving] = useState(false);
+  const [openingReportId, setOpeningReportId] = useState("");
 
   useEffect(() => {
     try {
@@ -718,22 +719,42 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
     }
   };
 
-  const openSavedReport = (report) => {
-    if (!report?.orders?.length) {
-      alert("This saved report does not include source CSV data. Save it again to reopen it here.");
-      return;
+  const openSavedReport = async (report) => {
+    setOpeningReportId(report.id || report.title || "");
+
+    try {
+      let fullReport = report;
+
+      if (!fullReport?.orders?.length && report?.id) {
+        const response = await fetch(`/api/reports/${report.id}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Could not open report.");
+        }
+
+        fullReport = data.report;
+      }
+
+      if (!fullReport?.orders?.length) {
+        throw new Error("This saved report does not include source CSV data. Save it again to reopen it here.");
+      }
+
+      setOrders(fullReport.orders);
+      setCosts(fullReport.costs || []);
+      setAds(fullReport.ads || []);
+      setShipping(fullReport.shipping || []);
+      setReturns(fullReport.returns || []);
+      setSettings({ ...defaultSettings, ...(fullReport.settings || {}) });
+      setSearchTerm("");
+      setSortBy("realProfit");
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      alert(error?.message || "Could not open report.");
+    } finally {
+      setOpeningReportId("");
     }
-
-    setOrders(report.orders);
-    setCosts(report.costs || []);
-    setAds(report.ads || []);
-    setShipping(report.shipping || []);
-    setReturns(report.returns || []);
-    setSettings({ ...defaultSettings, ...(report.settings || {}) });
-    setSearchTerm("");
-    setSortBy("realProfit");
-
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -1105,6 +1126,7 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
                       key={report.id || report.title}
                       type="button"
                       onClick={() => openSavedReport(report)}
+                      disabled={openingReportId === (report.id || report.title)}
                       className="rounded-3xl border border-slate-100 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -1114,7 +1136,7 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
                             {report.createdAt ? new Date(report.createdAt).toLocaleString() : "Saved locally"}
                           </p>
                           <p className="mt-3 text-xs font-semibold text-emerald-700">
-                            Open report
+                            {openingReportId === (report.id || report.title) ? "Opening..." : "Open report"}
                           </p>
                         </div>
                         <div className="rounded-2xl bg-white p-2 text-slate-500">

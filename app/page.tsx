@@ -110,7 +110,7 @@ export default async function HomePage() {
                 Admin
               </Link>
             )}
-            <Link href="/dashboard" className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-black hover:bg-emerald-300">
+            <Link href="/dashboard" prefetch className="rounded-full bg-emerald-400 px-5 py-2 text-sm font-semibold text-black hover:bg-emerald-300">
               Dashboard
             </Link>
             <UserButton />
@@ -147,7 +147,7 @@ export default async function HomePage() {
               </SignedOut>
 
               <SignedIn>
-                <Link href="/dashboard" className="inline-flex items-center justify-center rounded-full bg-emerald-400 px-7 py-4 font-semibold text-black hover:bg-emerald-300">
+                <Link href="/dashboard" prefetch className="inline-flex items-center justify-center rounded-full bg-emerald-400 px-7 py-4 font-semibold text-black hover:bg-emerald-300">
                   Open Dashboard <ArrowRight className="ml-2 h-5 w-5" />
                 </Link>
               </SignedIn>
@@ -370,7 +370,7 @@ export default async function HomePage() {
             </SignedOut>
 
             <SignedIn>
-              <Link href="/dashboard" className="rounded-full bg-emerald-400 px-7 py-4 font-semibold text-black hover:bg-emerald-300">
+              <Link href="/dashboard" prefetch className="rounded-full bg-emerald-400 px-7 py-4 font-semibold text-black hover:bg-emerald-300">
                 Open Dashboard
               </Link>
             </SignedIn>
