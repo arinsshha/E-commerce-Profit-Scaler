@@ -15,6 +15,12 @@ export default async function DashboardPage() {
       id: true,
       title: true,
       createdAt: true,
+      settings: true,
+      orders: true,
+      costs: true,
+      ads: true,
+      shipping: true,
+      returns: true,
       analysis: true,
     },
   });

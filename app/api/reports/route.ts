@@ -1,20 +1,10 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { requireAppUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { assertCanCreateReport } from "@/lib/limits";
 import type { PlanName } from "@/lib/app-config";
-
-const ReportSchema = z.object({
-  title: z.string().min(1).max(120),
-  settings: z.any(),
-  orders: z.array(z.any()),
-  costs: z.array(z.any()),
-  ads: z.array(z.any()),
-  shipping: z.array(z.any()),
-  returns: z.array(z.any()),
-  analysis: z.any()
-});
+import { ReportSchema } from "@/lib/report-schema";
+import type { Prisma } from "@prisma/client";
 
 export async function GET() {
   try {
@@ -58,12 +48,13 @@ export async function POST(request: Request) {
         ads: body.ads,
         shipping: body.shipping,
         returns: body.returns,
-        analysis: body.analysis
+        analysis: body.analysis as unknown as Prisma.InputJsonValue
       }
     });
 
     return NextResponse.json({ report });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message || "Could not save report" }, { status: 400 });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Could not save report";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }

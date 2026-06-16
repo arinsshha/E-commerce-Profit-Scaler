@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
 import { prisma } from "@/lib/db";
+import { getPlanFromStripePrice } from "@/lib/billing";
 
 export async function POST(request: Request) {
   if (!stripe) return NextResponse.json({ error: "Stripe is not configured" }, { status: 500 });
@@ -18,13 +19,16 @@ export async function POST(request: Request) {
     if (event.type === "checkout.session.completed") {
       const session: any = event.data.object;
       const userId = session.metadata?.userId;
+      const lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 1 });
+      const priceId = lineItems.data[0]?.price?.id;
+      const plan = priceId ? getPlanFromStripePrice(priceId) : null;
 
-      if (userId) {
+      if (userId && plan) {
         await prisma.user.update({
           where: { id: userId },
           data: {
             subscriptionStatus: "ACTIVE",
-            plan: "STARTER",
+            plan,
             stripeCustomerId: session.customer
           }
         });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAppUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { stripe } from "@/lib/stripe";
+import { getPlanFromStripePrice } from "@/lib/billing";
 
 export async function POST(request: Request) {
   try {
@@ -12,6 +13,11 @@ export async function POST(request: Request) {
 
     if (!priceId) {
       return NextResponse.json({ error: "Stripe priceId is required" }, { status: 400 });
+    }
+
+    const plan = getPlanFromStripePrice(priceId);
+    if (!plan) {
+      return NextResponse.json({ error: "Unknown Stripe priceId." }, { status: 400 });
     }
 
     let customerId = user.stripeCustomerId;
@@ -37,7 +43,10 @@ export async function POST(request: Request) {
       line_items: [{ price: priceId, quantity: 1 }],
       success_url: `${appUrl}/dashboard?payment=success`,
       cancel_url: `${appUrl}/dashboard?payment=cancelled`,
-      metadata: { userId: user.id }
+      metadata: { userId: user.id, plan },
+      subscription_data: {
+        metadata: { userId: user.id, plan }
+      }
     });
 
     return NextResponse.json({ url: session.url });

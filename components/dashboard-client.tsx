@@ -28,12 +28,14 @@ import {
   UserRound,
   ClipboardList,
   Activity,
-  CalendarDays
+  CalendarDays,
+  Trash2
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { FeatureLock } from "@/components/feature-lock";
+import { analyzeProfit } from "@/lib/profit";
 
 const APP_VERSION = "1.1.0";
 const STORAGE_KEY = "profitlens_real_world_mvp_v2";
@@ -449,104 +451,36 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
   }, [orders, costs, ads, shipping, returns, settings, storeName, clientName, consultantNotes]);
 
   const analysis = useMemo(() => {
-    const costMap = Object.fromEntries(costs.map((item) => [normalizeSku(item.sku), item]));
-    const adMap = Object.fromEntries(ads.map((item) => [normalizeSku(item.sku), item]));
-    const shippingMap = Object.fromEntries(shipping.map((item) => [normalizeSku(item.sku), item]));
-    const returnMap = Object.fromEntries(returns.map((item) => [normalizeSku(item.sku), item]));
-    const grouped = {};
-    const warnings = [];
-
-    orders.forEach((order, index) => {
-      const sku = normalizeSku(order.sku);
-      if (!sku) {
-        warnings.push(`Order row ${index + 2} has missing SKU.`);
-        return;
-      }
-
-      const cost = costMap[sku] || {};
-      const ship = shippingMap[sku] || {};
-      const ad = adMap[sku] || {};
-      const returnInfo = returnMap[sku] || {};
-      const quantity = Number(order.quantity || 1);
-      const sellingPrice = Number(order.sellingPrice || 0);
-      const productRevenue = sellingPrice * quantity;
-      const unitProductCost = Number(cost.productCost || 0);
-      const unitPackagingCost = Number(cost.packagingCost ?? settings.defaultPackagingCost ?? 0);
-      const productCost = unitProductCost * quantity;
-      const packagingCost = unitPackagingCost * quantity;
-      const shippingCost = Number(ship.shippingCost ?? settings.defaultShippingCost ?? 0);
-      const discount = Number(order.discount || 0);
-      const paymentFee = Number(order.paymentFee || 0) || (productRevenue * Number(settings.defaultPaymentFeePercent || 0)) / 100;
-
-      if (!costMap[sku]) warnings.push(`${order.product || sku}: missing product cost. Used ₹0 cost.`);
-      if (!shippingMap[sku] && Number(settings.defaultShippingCost || 0) === 0) warnings.push(`${order.product || sku}: missing shipping cost. Used ₹0 shipping.`);
-
-      if (!grouped[sku]) {
-        grouped[sku] = {
-          sku,
-          product: order.product || cost.product || sku,
-          revenue: 0,
-          unitsSold: 0,
-          orderCount: 0,
-          productCost: 0,
-          packagingCost: 0,
-          shippingCost: 0,
-          discount: 0,
-          paymentFee: 0,
-          adSpend: Number(ad.adSpend || 0),
-          returnedUnits: Number(returnInfo.returnedUnits || 0)
-        };
-      }
-
-      grouped[sku].revenue += productRevenue;
-      grouped[sku].unitsSold += quantity;
-      grouped[sku].orderCount += 1;
-      grouped[sku].productCost += productCost;
-      grouped[sku].packagingCost += packagingCost;
-      grouped[sku].shippingCost += shippingCost;
-      grouped[sku].discount += discount;
-      grouped[sku].paymentFee += paymentFee;
+    const profitAnalysis = analyzeProfit({
+      orders,
+      costs,
+      ads,
+      shipping,
+      returns,
+      settings
     });
 
-    const products = Object.values(grouped).map((item) => {
-      const adSpend = item.adSpend || item.orderCount * Number(settings.defaultAdSpendPerOrder || 0);
-      const totalCost = item.productCost + item.packagingCost + item.shippingCost + item.discount + item.paymentFee + adSpend;
-      const realProfit = item.revenue - totalCost;
-      const margin = item.revenue ? (realProfit / item.revenue) * 100 : 0;
-      const returnRate = item.unitsSold ? (item.returnedUnits / item.unitsSold) * 100 : 0;
-      const breakEvenPrice = item.unitsSold ? totalCost / item.unitsSold : 0;
-      const suggestedPrice = item.unitsSold ? (totalCost / item.unitsSold) / (1 - settings.targetMargin / 100) : 0;
-      return { ...item, adSpend, totalCost, realProfit, margin, returnRate, breakEvenPrice, suggestedPrice };
-    });
+    const lowMargin = [...profitAnalysis.lowMargin].sort((a, b) => a.margin - b.margin);
+    const lossMaking = [...profitAnalysis.lossMaking].sort((a, b) => a.realProfit - b.realProfit);
+    const highReturn = [...profitAnalysis.highReturn].sort((a, b) => b.returnRate - a.returnRate);
+    const promote = [...profitAnalysis.promote].sort((a, b) => b.realProfit - a.realProfit);
 
-    const totals = products.reduce(
-      (acc, item) => {
-        acc.revenue += item.revenue;
-        acc.realProfit += item.realProfit;
-        acc.unitsSold += item.unitsSold;
-        acc.adSpend += item.adSpend;
-        acc.returns += item.returnedUnits;
-        acc.totalCost += item.totalCost;
-        return acc;
-      },
-      { revenue: 0, realProfit: 0, unitsSold: 0, adSpend: 0, returns: 0, totalCost: 0 }
-    );
-    totals.margin = totals.revenue ? (totals.realProfit / totals.revenue) * 100 : 0;
-    totals.returnRate = totals.unitsSold ? (totals.returns / totals.unitsSold) * 100 : 0;
-
-    const lowMargin = products.filter((p) => p.margin < settings.targetMargin).sort((a, b) => a.margin - b.margin);
-    const lossMaking = products.filter((p) => p.realProfit < 0).sort((a, b) => a.realProfit - b.realProfit);
-    const highReturn = products.filter((p) => p.returnRate >= settings.highReturnThreshold).sort((a, b) => b.returnRate - a.returnRate);
-    const promote = products.filter((p) => p.margin >= settings.targetMargin && p.returnRate < settings.highReturnThreshold).sort((a, b) => b.realProfit - a.realProfit);
-
-    const dailyMap = {};
+    const dailyMap: Record<string, number> = {};
     orders.forEach((order) => {
       const date = order.date || "Unknown";
       dailyMap[date] = (dailyMap[date] || 0) + Number(order.sellingPrice || 0) * Number(order.quantity || 1);
     });
     const daily = Object.entries(dailyMap).map(([date, revenue]) => ({ date, revenue }));
 
-    return { products, totals, lowMargin, lossMaking, highReturn, promote, daily, warnings: [...new Set(warnings)].slice(0, 8) };
+    return {
+      ...profitAnalysis,
+      lowMargin,
+      lossMaking,
+      highReturn,
+      promote,
+      daily,
+      warnings: profitAnalysis.warnings.slice(0, 8)
+    };
   }, [orders, costs, ads, shipping, returns, settings]);
 
   const dataQuality = useMemo(() => {
@@ -784,6 +718,24 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
     }
   };
 
+  const openSavedReport = (report) => {
+    if (!report?.orders?.length) {
+      alert("This saved report does not include source CSV data. Save it again to reopen it here.");
+      return;
+    }
+
+    setOrders(report.orders);
+    setCosts(report.costs || []);
+    setAds(report.ads || []);
+    setShipping(report.shipping || []);
+    setReturns(report.returns || []);
+    setSettings({ ...defaultSettings, ...(report.settings || {}) });
+    setSearchTerm("");
+    setSortBy("realProfit");
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <div className="min-h-screen bg-[#eef1f5] text-slate-950 p-5 md:p-8">
       <div className="max-w-[1500px] mx-auto space-y-6">
@@ -976,11 +928,11 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
                   <div className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600">CSV only</div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <FileUploader title="Orders CSV" helper="orderId,date,product,sku,quantity,sellingPrice,discount,paymentFee" templateKey="orders" requiredColumns={["sku", "quantity", "sellingPrice"]} rowsCount={orders.length} onUpload={setOrders} />
-                  <FileUploader title="Product Cost CSV" helper="sku,product,productCost,packagingCost" templateKey="costs" requiredColumns={["sku", "productCost"]} rowsCount={costs.length} onUpload={setCosts} />
-                  <FileUploader title="Ad Spend CSV" helper="sku,adSpend" templateKey="ads" requiredColumns={["sku", "adSpend"]} rowsCount={ads.length} onUpload={setAds} />
-                  <FileUploader title="Shipping CSV" helper="sku,shippingCost" templateKey="shipping" requiredColumns={["sku", "shippingCost"]} rowsCount={shipping.length} onUpload={setShipping} />
-                  <FileUploader title="Returns CSV" helper="sku,returnedUnits" templateKey="returns" requiredColumns={["sku", "returnedUnits"]} rowsCount={returns.length} onUpload={setReturns} />
+                  <FileUploader title="Orders CSV" helper="orderId,date,product,sku,quantity,sellingPrice,discount,paymentFee" templateKey="orders" requiredColumns={["sku", "quantity", "sellingPrice"]} rowsCount={orders.length} onUpload={setOrders} onRemove={() => setOrders([])} />
+                  <FileUploader title="Product Cost CSV" helper="sku,product,productCost,packagingCost" templateKey="costs" requiredColumns={["sku", "productCost"]} rowsCount={costs.length} onUpload={setCosts} onRemove={() => setCosts([])} />
+                  <FileUploader title="Ad Spend CSV" helper="sku,adSpend" templateKey="ads" requiredColumns={["sku", "adSpend"]} rowsCount={ads.length} onUpload={setAds} onRemove={() => setAds([])} />
+                  <FileUploader title="Shipping CSV" helper="sku,shippingCost" templateKey="shipping" requiredColumns={["sku", "shippingCost"]} rowsCount={shipping.length} onUpload={setShipping} onRemove={() => setShipping([])} />
+                  <FileUploader title="Returns CSV" helper="sku,returnedUnits" templateKey="returns" requiredColumns={["sku", "returnedUnits"]} rowsCount={returns.length} onUpload={setReturns} onRemove={() => setReturns([])} />
                 </div>
               </CardContent>
             </Card>
@@ -1149,19 +1101,27 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {reports.map((report) => (
-                    <div key={report.id || report.title} className="rounded-3xl border border-slate-100 bg-slate-50 p-4">
+                    <button
+                      key={report.id || report.title}
+                      type="button"
+                      onClick={() => openSavedReport(report)}
+                      className="rounded-3xl border border-slate-100 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <h3 className="font-semibold text-slate-900">{report.title}</h3>
                           <p className="mt-1 text-sm text-slate-500">
                             {report.createdAt ? new Date(report.createdAt).toLocaleString() : "Saved locally"}
                           </p>
+                          <p className="mt-3 text-xs font-semibold text-emerald-700">
+                            Open report
+                          </p>
                         </div>
                         <div className="rounded-2xl bg-white p-2 text-slate-500">
                           <FileText className="h-4 w-4" />
                         </div>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )}
@@ -1197,28 +1157,47 @@ function InfoMiniCard({ title, value, subValue, icon, accent }) {
   );
 }
 
-function FileUploader({ title, helper, templateKey, requiredColumns, onUpload, rowsCount }) {
+function FileUploader({ title, helper, templateKey, requiredColumns, onUpload, onRemove, rowsCount }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [fileName, setFileName] = useState("");
+  const inputId = `upload-${templateKey}`;
 
   return (
     <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-300 hover:bg-emerald-50/40">
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="rounded-2xl bg-white p-3 text-emerald-700 shadow-sm">
-          <Upload className="h-5 w-5" />
-        </div>
         <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-slate-600">{rowsCount} rows</span>
       </div>
       <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
       <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
+      {fileName && (
+        <div className="mt-3 rounded-2xl bg-white px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-100">
+          <span className="font-semibold text-slate-800">File:</span> {fileName}
+        </div>
+      )}
       <div className="mt-3 flex flex-col gap-2">
+        <label
+          htmlFor={inputId}
+          className="flex cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-emerald-200 bg-white px-4 py-5 text-center transition hover:border-emerald-400 hover:bg-emerald-50"
+        >
+          <Upload className="h-5 w-5 text-emerald-600" />
+          <span className="mt-2 text-sm font-semibold text-slate-900">
+            {fileName ? "Replace CSV file" : "Add CSV file"}
+          </span>
+          <span className="mt-1 text-xs text-slate-500">
+            Click to upload a .csv file
+          </span>
+        </label>
         <input
+          id={inputId}
+          key={fileName || "empty-file"}
           type="file"
           accept=".csv"
-          className="block w-full text-xs text-slate-600"
+          className="sr-only"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (!file) return;
+            setFileName(file.name);
             const reader = new FileReader();
             reader.onload = () => {
               try {
@@ -1245,6 +1224,7 @@ setError("");
 setSuccess("CSV uploaded successfully. ProfitLens auto-mapped columns when needed.");
 onUpload(mappedRows);
               } catch (err) {
+                setFileName("");
                 setError(err.message || "Could not read CSV file.");
               }
             };
@@ -1255,6 +1235,21 @@ onUpload(mappedRows);
         <button onClick={() => downloadTemplate(templateKey)} className="text-xs text-left font-medium underline underline-offset-4 text-slate-600">
           Download sample template
         </button>
+        {fileName && (
+          <button
+            type="button"
+            onClick={() => {
+              setFileName("");
+              setError("");
+              setSuccess("");
+              onRemove();
+            }}
+            className="inline-flex items-center justify-center rounded-2xl border border-red-100 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            Remove file
+          </button>
+        )}
       </div>
       {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
       {success && <p className="mt-2 text-xs text-emerald-600">{success}</p>}
