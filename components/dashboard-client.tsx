@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -8,7 +8,6 @@ import {
   TrendingUp,
   TrendingDown,
   AlertTriangle,
-  Sparkles,
   Package,
   IndianRupee,
   BarChart3,
@@ -38,7 +37,7 @@ import { FeatureLock } from "@/components/feature-lock";
 import { analyzeProfit } from "@/lib/profit";
 import { getPlanConfig } from "@/lib/app-config";
 
-const APP_VERSION = "1.1.0";
+const APP_VERSION = "1.2.0";
 const STORAGE_KEY = "profitlens_real_world_mvp_v2";
 
 const sampleOrders = [
@@ -412,6 +411,236 @@ if (isCostUpload) {
   return rows;
 }
 
+function Pill({ text }) {
+  return <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">{text}</span>;
+}
+
+function InfoMiniCard({ title, value, subValue, icon, accent }) {
+  const accentMap = {
+    emerald: "bg-emerald-100 text-emerald-700",
+    sky: "bg-sky-100 text-sky-700",
+    violet: "bg-violet-100 text-violet-700",
+    amber: "bg-amber-100 text-amber-700"
+  };
+
+  return (
+    <div className="rounded-[24px] bg-slate-50 p-4">
+      <div className="mb-3 flex items-start justify-between">
+        <div className={`rounded-2xl p-2 ${accentMap[accent]}`}>{icon}</div>
+      </div>
+      <p className="text-xs font-medium text-slate-500">{title}</p>
+      <h3 className="mt-1 text-lg font-bold text-slate-900 truncate">{value}</h3>
+      <p className="text-sm text-slate-500">{subValue}</p>
+    </div>
+  );
+}
+
+function UpgradeOptions({ checkingOutPlan, onCheckout }) {
+  const plans = [
+    { key: "STARTER", name: "Starter", price: "Rs. 799/mo", detail: "10 reports, 5,000 rows, exports, advanced AI" },
+    { key: "GROWTH", name: "Growth", price: "Rs. 1,999/mo", detail: "50 reports, 25,000 rows, exports, advanced AI" },
+    { key: "PRO", name: "Pro", price: "Rs. 4,999/mo", detail: "Unlimited reports, 100,000 rows, exports, advanced AI" }
+  ];
+
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      {plans.map((plan) => (
+        <div key={plan.key} className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-black/5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
+              <p className="mt-1 text-2xl font-bold text-emerald-700">{plan.price}</p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Paid</span>
+          </div>
+          <p className="mt-3 min-h-[40px] text-sm text-slate-500">{plan.detail}</p>
+          <button
+            type="button"
+            onClick={() => onCheckout(plan.key)}
+            disabled={checkingOutPlan === plan.key}
+            className="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+          >
+            {checkingOutPlan === plan.key ? "Opening checkout..." : `Upgrade to ${plan.name}`}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ActionPlanList({ title, items, empty, tone }) {
+  const toneMap = {
+    red: "bg-red-50 text-red-700 ring-red-100",
+    amber: "bg-amber-50 text-amber-800 ring-amber-100",
+    sky: "bg-sky-50 text-sky-700 ring-sky-100",
+    orange: "bg-orange-50 text-orange-800 ring-orange-100",
+    emerald: "bg-emerald-50 text-emerald-700 ring-emerald-100"
+  };
+
+  return (
+    <div className="rounded-[24px] bg-slate-50 p-4">
+      <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+      <div className="mt-3 space-y-2">
+        {items.length ? (
+          items.map((item) => (
+            <div key={`${title}-${item.sku}`} className={`rounded-2xl p-3 text-xs ring-1 ${toneMap[tone]}`}>
+              <p className="font-bold">{item.product}</p>
+              <p className="mt-1 opacity-90">{item.detail}</p>
+            </div>
+          ))
+        ) : (
+          <p className="rounded-2xl bg-white p-3 text-xs text-slate-500 ring-1 ring-slate-100">{empty}</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SimulatorInput({ label, value, min, max, onChange }) {
+  return (
+    <label className="block rounded-2xl bg-slate-50 p-3">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="text-sm font-medium text-slate-600">{label}</span>
+        <span className="rounded-full bg-white px-2 py-1 text-xs font-bold text-slate-700 ring-1 ring-slate-100">
+          {value > 0 ? "+" : ""}{value}%
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step="1"
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        className="w-full accent-emerald-600"
+      />
+    </label>
+  );
+}
+
+function ComparisonTile({ label, value, positive }) {
+  return (
+    <div className="rounded-[24px] bg-slate-50 p-4">
+      <p className="text-sm text-slate-500">{label}</p>
+      <p className={`mt-2 text-2xl font-bold ${positive ? "text-emerald-700" : "text-red-700"}`}>{value}</p>
+    </div>
+  );
+}
+
+function BillingRow({ label, value }) {
+  return (
+    <div className="rounded-2xl bg-slate-50 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
+      <p className="mt-1 text-sm font-bold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function FileUploader({ title, helper, templateKey, requiredColumns, onUpload, onRemove, rowsCount, currentTotalRows, maxRows }) {
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [fileName, setFileName] = useState("");
+  const inputId = `upload-${templateKey}`;
+
+  return (
+    <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-300 hover:bg-emerald-50/40">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-slate-600">{rowsCount} rows</span>
+      </div>
+      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+      <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
+      {fileName && (
+        <div className="mt-3 rounded-2xl bg-white px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-100">
+          <span className="font-semibold text-slate-800">File:</span> {fileName}
+        </div>
+      )}
+      <div className="mt-3 flex flex-col gap-2">
+        <label
+          htmlFor={inputId}
+          className="flex cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-emerald-200 bg-white px-4 py-5 text-center transition hover:border-emerald-400 hover:bg-emerald-50"
+        >
+          <Upload className="h-5 w-5 text-emerald-600" />
+          <span className="mt-2 text-sm font-semibold text-slate-900">
+            {fileName ? "Replace CSV file" : "Add CSV file"}
+          </span>
+          <span className="mt-1 text-xs text-slate-500">
+            Click to upload a .csv file
+          </span>
+        </label>
+        <input
+          id={inputId}
+          key={fileName || "empty-file"}
+          type="file"
+          accept=".csv"
+          className="sr-only"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            setFileName(file.name);
+            const reader = new FileReader();
+            reader.onload = () => {
+              try {
+                const parsed = parseCSV(String(reader.result));
+
+if (!parsed.length) {
+  throw new Error("CSV file is empty.");
+}
+
+const mappedRows = autoMapCsvRows(parsed, requiredColumns);
+const nextTotalRows = Number(currentTotalRows || 0) - Number(rowsCount || 0) + mappedRows.length;
+
+if (nextTotalRows > Number(maxRows || 0)) {
+  throw new Error(`This upload would use ${nextTotalRows} CSV rows. Your plan allows up to ${maxRows} rows.`);
+}
+
+const availableColumns = Object.keys(mappedRows[0] || {});
+const missing = requiredColumns.filter(
+  (column) => !availableColumns.includes(column)
+);
+
+if (missing.length) {
+  throw new Error(
+    `Missing columns: ${missing.join(", ")}. If this is a Shopify file, make sure it contains SKU, quantity, and price columns.`
+  );
+}
+
+setError("");
+setSuccess("CSV uploaded successfully. ProfitLens auto-mapped columns when needed.");
+onUpload(mappedRows);
+              } catch (err) {
+                setFileName("");
+                setError(err.message || "Could not read CSV file.");
+              }
+            };
+            reader.onerror = () => setError("Could not read this file.");
+            reader.readAsText(file);
+          }}
+        />
+        <button onClick={() => downloadTemplate(templateKey)} className="text-xs text-left font-medium underline underline-offset-4 text-slate-600">
+          Download sample template
+        </button>
+        {fileName && (
+          <button
+            type="button"
+            onClick={() => {
+              setFileName("");
+              setError("");
+              setSuccess("");
+              onRemove();
+            }}
+            className="inline-flex items-center justify-center rounded-2xl border border-red-100 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
+          >
+            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+            Remove file
+          </button>
+        )}
+      </div>
+      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
+      {success && <p className="mt-2 text-xs text-emerald-600">{success}</p>}
+    </div>
+  );
+}
+
 export function DashboardClient({ initialReports = [], userPlan = "FREE", reportsUsedThisMonth = 0 } = {}) {
   const [orders, setOrders] = useState(sampleOrders);
   const [costs, setCosts] = useState(sampleCosts);
@@ -424,6 +653,15 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
   const [storeName, setStoreName] = useState("Demo E-commerce Store");
   const [clientName, setClientName] = useState("");
   const [consultantNotes, setConsultantNotes] = useState("");
+  const [workspaceMode, setWorkspaceMode] = useState("demo");
+  const [uploadPreset, setUploadPreset] = useState("custom");
+  const [simulator, setSimulator] = useState({
+    priceChange: 0,
+    adSpendChange: 0,
+    shippingChange: 0,
+    discountChange: 0,
+    returnRateChange: 0
+  });
   const [reports, setReports] = useState(initialReports || []);
   const [saving, setSaving] = useState(false);
   const [openingReportId, setOpeningReportId] = useState("");
@@ -449,15 +687,17 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
       setStoreName(parsed.storeName || "Demo E-commerce Store");
       setClientName(parsed.clientName || "");
       setConsultantNotes(parsed.consultantNotes || "");
+      setWorkspaceMode(parsed.workspaceMode || "demo");
+      setUploadPreset(parsed.uploadPreset || "custom");
     } catch {
       // Ignore invalid local data.
     }
   }, []);
 
   useEffect(() => {
-    const payload = { orders, costs, ads, shipping, returns, settings, storeName, clientName, consultantNotes, version: APP_VERSION };
+    const payload = { orders, costs, ads, shipping, returns, settings, storeName, clientName, consultantNotes, workspaceMode, uploadPreset, version: APP_VERSION };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [orders, costs, ads, shipping, returns, settings, storeName, clientName, consultantNotes]);
+  }, [orders, costs, ads, shipping, returns, settings, storeName, clientName, consultantNotes, workspaceMode, uploadPreset]);
 
   const analysis = useMemo(() => {
     const profitAnalysis = analyzeProfit({
@@ -589,6 +829,117 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
     return fixes.slice(0, 3);
   }, [analysis, settings]);
 
+  const actionPlan = useMemo(() => {
+    const stopAds = analysis.lossMaking
+      .filter((product) => Number(product.adSpend || 0) > 0)
+      .slice(0, 4)
+      .map((product) => ({
+        sku: product.sku,
+        product: product.product,
+        detail: `Ad spend ${formatMoney(product.adSpend, settings)} while profit is ${formatMoney(product.realProfit, settings)}.`
+      }));
+
+    const increasePrice = analysis.lowMargin
+      .slice(0, 4)
+      .map((product) => ({
+        sku: product.sku,
+        product: product.product,
+        detail: `Target selling price near ${formatMoney(product.suggestedPrice, settings)} for ${settings.targetMargin}% margin.`
+      }));
+
+    const reduceDiscount = analysis.products
+      .filter((product) => Number(product.discount || 0) > 0 && product.margin < settings.targetMargin)
+      .sort((a, b) => Number(b.discount || 0) - Number(a.discount || 0))
+      .slice(0, 4)
+      .map((product) => ({
+        sku: product.sku,
+        product: product.product,
+        detail: `Discount impact ${formatMoney(product.discount, settings)} with margin ${formatPercent(product.margin)}.`
+      }));
+
+    const fixReturns = analysis.highReturn.slice(0, 4).map((product) => ({
+      sku: product.sku,
+      product: product.product,
+      detail: `Return rate ${formatPercent(product.returnRate)}. Check quality, size details, photos, and packaging.`
+    }));
+
+    const promoteWinners = analysis.promote.slice(0, 4).map((product) => ({
+      sku: product.sku,
+      product: product.product,
+      detail: `Profit ${formatMoney(product.realProfit, settings)} with ${formatPercent(product.margin)} margin.`
+    }));
+
+    return { stopAds, increasePrice, reduceDiscount, fixReturns, promoteWinners };
+  }, [analysis, settings]);
+
+  const simulatorResult = useMemo(() => {
+    const priceMultiplier = 1 + Number(simulator.priceChange || 0) / 100;
+    const adMultiplier = 1 + Number(simulator.adSpendChange || 0) / 100;
+    const shippingMultiplier = 1 + Number(simulator.shippingChange || 0) / 100;
+    const discountMultiplier = 1 + Number(simulator.discountChange || 0) / 100;
+    const returnDrag = analysis.totals.revenue * (Number(simulator.returnRateChange || 0) / 100);
+
+    const projectedRevenue = analysis.totals.revenue * priceMultiplier;
+    const projectedCosts = analysis.products.reduce((total, product) => {
+      return (
+        total +
+        Number(product.productCost || 0) +
+        Number(product.packagingCost || 0) +
+        Number(product.paymentFee || 0) +
+        Number(product.shippingCost || 0) * shippingMultiplier +
+        Number(product.discount || 0) * discountMultiplier +
+        Number(product.adSpend || 0) * adMultiplier
+      );
+    }, 0);
+
+    const projectedProfit = projectedRevenue - projectedCosts - returnDrag;
+    const projectedMargin = projectedRevenue ? (projectedProfit / projectedRevenue) * 100 : 0;
+
+    return {
+      revenue: projectedRevenue,
+      profit: projectedProfit,
+      margin: projectedMargin,
+      profitDelta: projectedProfit - analysis.totals.realProfit
+    };
+  }, [analysis, simulator]);
+
+  const missingCostRows = useMemo(() => {
+    const costSkus = new Set(costs.map((item) => normalizeSku(item.sku)));
+    return analysis.products
+      .filter((product) => !costSkus.has(normalizeSku(product.sku)))
+      .map((product) => ({ sku: product.sku, product: product.product, productCost: "", packagingCost: "" }));
+  }, [analysis.products, costs]);
+
+  const missingShippingRows = useMemo(() => {
+    const shippingSkus = new Set(shipping.map((item) => normalizeSku(item.sku)));
+    return analysis.products
+      .filter((product) => !shippingSkus.has(normalizeSku(product.sku)))
+      .map((product) => ({ sku: product.sku, shippingCost: "" }));
+  }, [analysis.products, shipping]);
+
+  const onboardingItems = useMemo(() => [
+    { label: "Choose demo or live workspace", done: workspaceMode === "live" },
+    { label: "Upload orders", done: orders.length > 0 },
+    { label: "Upload product costs", done: costs.length > 0 },
+    { label: "Upload shipping costs", done: shipping.length > 0 },
+    { label: "Upload ad spend", done: ads.length > 0 },
+    { label: "Save first report", done: reports.length > 0 }
+  ], [workspaceMode, orders.length, costs.length, shipping.length, ads.length, reports.length]);
+
+  const reportComparison = useMemo(() => {
+    const previous = reports.find((report) => report?.analysis?.totals)?.analysis?.totals;
+    if (!previous) return null;
+
+    return {
+      revenueDelta: Number(analysis.totals.revenue || 0) - Number(previous.revenue || 0),
+      profitDelta: Number(analysis.totals.realProfit || 0) - Number(previous.realProfit || 0),
+      marginDelta: Number(analysis.totals.margin || 0) - Number(previous.margin || 0),
+      newLossMakers: analysis.lossMaking.filter(
+        (product) => !(reports[0]?.analysis?.lossMaking || []).some((oldProduct) => oldProduct.sku === product.sku)
+      ).length
+    };
+  }, [analysis, reports]);
+
   const suggestions = useMemo(() => {
     const result = [];
 
@@ -661,6 +1012,12 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
   const maxCsvRows = Number(planConfig.maxCsvRows);
   const reportLimitLabel = planConfig.reportsPerMonth === "unlimited" ? "Unlimited" : `${reportsUsedThisMonth}/${planConfig.reportsPerMonth}`;
   const csvLimitLabel = `${totalUploadedRows}/${planConfig.maxCsvRows}`;
+  const presetHelper = {
+    shopify: "Auto-map Shopify exports with SKU, product, quantity, price, discount, and fees where available.",
+    woocommerce: "Auto-map WooCommerce orders and product fields into the ProfitLens format.",
+    marketplace: "Use this for Amazon or marketplace style SKU, sales, ads, returns, and shipping exports.",
+    custom: "Use the sample templates when your CSV columns are custom."
+  }[uploadPreset];
 
   const exportRows = () =>
     analysis.products.map((p) => ({
@@ -690,6 +1047,52 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
     setStoreName("Demo E-commerce Store");
     setClientName("");
     setConsultantNotes("");
+    setWorkspaceMode("demo");
+    setUploadPreset("custom");
+    setSimulator({
+      priceChange: 0,
+      adSpendChange: 0,
+      shippingChange: 0,
+      discountChange: 0,
+      returnRateChange: 0
+    });
+  };
+
+  const startLiveWorkspace = () => {
+    setOrders([]);
+    setCosts([]);
+    setAds([]);
+    setShipping([]);
+    setReturns([]);
+    setSearchTerm("");
+    setSortBy("realProfit");
+    setStoreName("");
+    setClientName("");
+    setConsultantNotes("");
+    setWorkspaceMode("live");
+  };
+
+  const applyPreset = (preset) => {
+    setUploadPreset(preset);
+    if (preset === "shopify") setStoreName(storeName || "Shopify Store");
+    if (preset === "woocommerce") setStoreName(storeName || "WooCommerce Store");
+    if (preset === "amazon") setStoreName(storeName || "Marketplace Store");
+  };
+
+  const downloadMissingCosts = () => {
+    if (!missingCostRows.length) {
+      alert("No missing product costs found.");
+      return;
+    }
+    downloadFile("missing_product_costs.csv", toCSV(missingCostRows));
+  };
+
+  const downloadMissingShipping = () => {
+    if (!missingShippingRows.length) {
+      alert("No missing shipping costs found.");
+      return;
+    }
+    downloadFile("missing_shipping_costs.csv", toCSV(missingShippingRows));
   };
 
   const exportAnalysis = async () => {
@@ -726,11 +1129,15 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
           rows,
           summary: {
             storeName,
+            clientName,
             generatedAt: new Date().toLocaleString(),
             revenue: formatMoney(analysis.totals.revenue, settings),
             profit: formatMoney(analysis.totals.realProfit, settings),
             margin: formatPercent(analysis.totals.margin)
-          }
+          },
+          topFixes,
+          actionPlan,
+          consultantNotes
         })
       });
 
@@ -961,6 +1368,51 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
           </div>
         </motion.section>
 
+        <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+          <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Workspace Mode</p>
+                  <h2 className="mt-2 text-2xl font-bold text-slate-900">
+                    {workspaceMode === "demo" ? "Demo workspace" : "Live store data"}
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    {workspaceMode === "demo"
+                      ? "Explore ProfitLens with sample data, then switch to live uploads."
+                      : "Upload your own CSV files and build a real report."}
+                  </p>
+                </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                  {workspaceMode === "demo" ? "Demo" : "Live"}
+                </span>
+              </div>
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button onClick={startLiveWorkspace} className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">
+                  Start with your store data
+                </button>
+                <button onClick={resetDemoData} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
+                  Load sample data
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
+            <CardContent className="p-6">
+              <p className="text-sm font-medium text-slate-500">Onboarding Checklist</p>
+              <div className="mt-4 grid gap-2 md:grid-cols-2">
+                {onboardingItems.map((item) => (
+                  <div key={item.label} className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                    {item.done ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> : <XCircle className="h-4 w-4 text-slate-300" />}
+                    {item.label}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
         <section className="grid gap-4 lg:grid-cols-3">
           <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
             <CardContent className="p-6">
@@ -1086,35 +1538,46 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
           </Card>
 
           <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
-  <CardContent className="p-6">
-    <p className="text-sm font-medium text-slate-500">Data Quality</p>
-
-    <h2 className="mt-2 text-4xl font-bold text-slate-900">
-      {dataQuality.score}/100
-    </h2>
-
-    <p
-      className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold ${
-        dataQuality.score >= 85
-          ? "bg-emerald-100 text-emerald-700"
-          : dataQuality.score >= 60
-          ? "bg-yellow-100 text-yellow-800"
-          : "bg-red-100 text-red-700"
-      }`}
-    >
-      {dataQuality.status}
-    </p>
-
-    <div className="mt-4 space-y-2 text-sm text-slate-600">
-      <p>Missing product cost: {dataQuality.missingCost}</p>
-      <p>Missing shipping cost: {dataQuality.missingShipping}</p>
-    </div>
-
-    <p className="mt-4 text-xs text-slate-500">
-      Better data gives a more accurate profit report.
-    </p>
-  </CardContent>
-</Card>
+            <CardContent className="p-6">
+              <p className="text-sm font-medium text-slate-500">Data Quality</p>
+              <h2 className="mt-2 text-4xl font-bold text-slate-900">
+                {dataQuality.score}/100
+              </h2>
+              <p
+                className={`mt-2 inline-flex rounded-full px-3 py-1 text-xs font-bold ${
+                  dataQuality.score >= 85
+                    ? "bg-emerald-100 text-emerald-700"
+                    : dataQuality.score >= 60
+                    ? "bg-yellow-100 text-yellow-800"
+                    : "bg-red-100 text-red-700"
+                }`}
+              >
+                {dataQuality.status}
+              </p>
+              <div className="mt-4 space-y-2 text-sm text-slate-600">
+                <p>{missingCostRows.length} SKUs missing product cost</p>
+                <p>{missingShippingRows.length} SKUs missing shipping</p>
+              </div>
+              <div className="mt-4 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={downloadMissingCosts}
+                  disabled={!missingCostRows.length}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Download missing-cost template
+                </button>
+                <button
+                  type="button"
+                  onClick={downloadMissingShipping}
+                  disabled={!missingShippingRows.length}
+                  className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Download missing-shipping template
+                </button>
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
         <section className="grid gap-4 md:grid-cols-5">
@@ -1123,6 +1586,31 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
           <MetricCard icon={<Percent className="h-5 w-5" />} label="Net Margin" value={formatPercent(analysis.totals.margin)} positive={analysis.totals.margin >= settings.targetMargin} />
           <MetricCard icon={<Package className="h-5 w-5" />} label="Units Sold" value={analysis.totals.unitsSold} />
           <MetricCard icon={<AlertTriangle className="h-5 w-5" />} label="Return Rate" value={formatPercent(analysis.totals.returnRate)} warning={analysis.totals.returnRate >= settings.highReturnThreshold} />
+        </section>
+
+        <section>
+          <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
+            <CardContent className="p-6">
+              <div className="mb-5 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">What Changed?</p>
+                  <h2 className="text-2xl font-bold text-slate-900">Tomorrow Action Plan</h2>
+                </div>
+                {!planIsPaid && (
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-bold text-amber-800">
+                    Upgrade for advanced AI action plan
+                  </span>
+                )}
+              </div>
+              <div className="grid gap-4 lg:grid-cols-5">
+                <ActionPlanList title="Stop Ads" items={actionPlan.stopAds} empty="No losing ad spend found." tone="red" />
+                <ActionPlanList title="Increase Price" items={actionPlan.increasePrice} empty="No urgent price increase found." tone="amber" />
+                <ActionPlanList title="Reduce Discount" items={actionPlan.reduceDiscount} empty="Discounts look under control." tone="sky" />
+                <ActionPlanList title="Fix Returns" items={actionPlan.fixReturns} empty="No high-return product found." tone="orange" />
+                <ActionPlanList title="Promote Winners" items={actionPlan.promoteWinners} empty="Upload more data to find winners." tone="emerald" />
+              </div>
+            </CardContent>
+          </Card>
         </section>
 
         <section className="grid gap-6 xl:grid-cols-[1.45fr_0.9fr]">
@@ -1135,6 +1623,31 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
                     <p className="text-sm text-slate-500">Upload all 5 CSV files for a complete profit audit.</p>
                   </div>
                   <div className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600">CSV only</div>
+                </div>
+                <div className="mb-5 rounded-[24px] bg-slate-50 p-4">
+                  <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Platform preset</p>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      ["shopify", "Shopify"],
+                      ["woocommerce", "WooCommerce"],
+                      ["marketplace", "Amazon/Marketplace"],
+                      ["custom", "Custom CSV"]
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => applyPreset(key)}
+                        className={`rounded-2xl px-3 py-2 text-sm font-semibold transition ${
+                          uploadPreset === key
+                            ? "bg-slate-900 text-white"
+                            : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mt-3 text-sm text-slate-500">{presetHelper}</p>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   <FileUploader title="Orders CSV" helper="orderId,date,product,sku,quantity,sellingPrice,discount,paymentFee" templateKey="orders" requiredColumns={["sku", "quantity", "sellingPrice"]} rowsCount={orders.length} currentTotalRows={totalUploadedRows} maxRows={maxCsvRows} onUpload={setOrders} onRemove={() => setOrders([])} />
@@ -1152,7 +1665,7 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
                   <h2 className="font-bold flex items-center gap-2 text-yellow-900"><AlertTriangle className="w-5 h-5" /> Data Warnings</h2>
                   <div className="grid md:grid-cols-2 gap-2 mt-3">
                     {analysis.warnings.map((warning, index) => (
-                      <p key={index} className="text-sm text-yellow-900">• {warning}</p>
+                      <p key={index} className="text-sm text-yellow-900">â€¢ {warning}</p>
                     ))}
                   </div>
                 </CardContent>
@@ -1247,6 +1760,43 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
             <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
               <CardContent className="p-6">
                 <div className="mb-5 flex items-center gap-2">
+                  <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700">
+                    <Activity className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-slate-900">Before/After Profit Simulator</h2>
+                    <p className="text-sm text-slate-500">Preview profit impact before changing the business.</p>
+                  </div>
+                </div>
+                <div className="grid gap-3">
+                  <SimulatorInput label="Selling price change" value={simulator.priceChange} min={-30} max={50} onChange={(value) => setSimulator((current) => ({ ...current, priceChange: value }))} />
+                  <SimulatorInput label="Ad spend change" value={simulator.adSpendChange} min={-100} max={100} onChange={(value) => setSimulator((current) => ({ ...current, adSpendChange: value }))} />
+                  <SimulatorInput label="Shipping cost change" value={simulator.shippingChange} min={-50} max={80} onChange={(value) => setSimulator((current) => ({ ...current, shippingChange: value }))} />
+                  <SimulatorInput label="Discount change" value={simulator.discountChange} min={-100} max={100} onChange={(value) => setSimulator((current) => ({ ...current, discountChange: value }))} />
+                  <SimulatorInput label="Return rate change" value={simulator.returnRateChange} min={-20} max={30} onChange={(value) => setSimulator((current) => ({ ...current, returnRateChange: value }))} />
+                </div>
+                <div className="mt-5 grid gap-3 rounded-[24px] bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-slate-500">Projected profit</span>
+                    <span className="font-bold text-slate-900">{formatMoney(simulatorResult.profit, settings)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-slate-500">Projected margin</span>
+                    <span className="font-bold text-slate-900">{formatPercent(simulatorResult.margin)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm text-slate-500">Profit change</span>
+                    <span className={`font-bold ${simulatorResult.profitDelta >= 0 ? "text-emerald-700" : "text-red-700"}`}>
+                      {simulatorResult.profitDelta >= 0 ? "+" : ""}{formatMoney(simulatorResult.profitDelta, settings)}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
+              <CardContent className="p-6">
+                <div className="mb-5 flex items-center gap-2">
                   <div className="rounded-2xl bg-violet-100 p-2 text-violet-700">
                     <TrendingUp className="h-5 w-5" />
                   </div>
@@ -1301,6 +1851,62 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
           </Card>
         </section>
 
+        <section className="grid gap-4 lg:grid-cols-2">
+          <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
+            <CardContent className="p-6">
+              <div className="mb-5 flex items-center gap-2">
+                <div className="rounded-2xl bg-violet-100 p-2 text-violet-700">
+                  <BarChart3 className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Report Comparison</p>
+                  <h2 className="text-xl font-bold text-slate-900">Current vs Last Saved Report</h2>
+                </div>
+              </div>
+              {reportComparison ? (
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <ComparisonTile label="Revenue change" value={formatMoney(reportComparison.revenueDelta, settings)} positive={reportComparison.revenueDelta >= 0} />
+                  <ComparisonTile label="Profit change" value={formatMoney(reportComparison.profitDelta, settings)} positive={reportComparison.profitDelta >= 0} />
+                  <ComparisonTile label="Margin change" value={`${reportComparison.marginDelta >= 0 ? "+" : ""}${formatPercent(reportComparison.marginDelta)}`} positive={reportComparison.marginDelta >= 0} />
+                  <ComparisonTile label="New loss-making products" value={reportComparison.newLossMakers} positive={reportComparison.newLossMakers === 0} />
+                </div>
+              ) : (
+                <div className="rounded-3xl bg-slate-50 p-5 text-sm text-slate-600">
+                  Save a report first, then compare future uploads against it.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
+            <CardContent className="p-6">
+              <div className="mb-5 flex items-center gap-2">
+                <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700">
+                  <ReceiptIndianRupee className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Plan / Billing</p>
+                  <h2 className="text-xl font-bold text-slate-900">{planConfig.name} Plan</h2>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <BillingRow label="Reports used" value={reportLimitLabel} />
+                <BillingRow label="CSV rows used" value={csvLimitLabel} />
+                <BillingRow label="Exports" value={planConfig.canExport ? "Unlocked" : "Upgrade required"} />
+                <BillingRow label="AI level" value={planConfig.aiLevel === "advanced" ? "Advanced" : "Simple"} />
+              </div>
+              <p className="mt-4 rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
+                Admin-granted plans appear here as the active plan. Upgrade, cancel, and payment management can be connected to the billing provider.
+              </p>
+              {!planIsPaid && (
+                <div className="mt-4">
+                  <UpgradeOptions checkingOutPlan={checkingOutPlan} onCheckout={startStripeCheckout} />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
         <section>
           <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
             <CardContent className="p-6">
@@ -1345,168 +1951,6 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
           </Card>
         </section>
       </div>
-    </div>
-  );
-}
-
-function Pill({ text }) {
-  return <span className="rounded-full bg-slate-100 px-3 py-1 font-medium text-slate-600">{text}</span>;
-}
-
-function InfoMiniCard({ title, value, subValue, icon, accent }) {
-  const accentMap = {
-    emerald: "bg-emerald-100 text-emerald-700",
-    sky: "bg-sky-100 text-sky-700",
-    violet: "bg-violet-100 text-violet-700",
-    amber: "bg-amber-100 text-amber-700"
-  };
-
-  return (
-    <div className="rounded-[24px] bg-slate-50 p-4">
-      <div className="mb-3 flex items-start justify-between">
-        <div className={`rounded-2xl p-2 ${accentMap[accent]}`}>{icon}</div>
-      </div>
-      <p className="text-xs font-medium text-slate-500">{title}</p>
-      <h3 className="mt-1 text-lg font-bold text-slate-900 truncate">{value}</h3>
-      <p className="text-sm text-slate-500">{subValue}</p>
-    </div>
-  );
-}
-
-function UpgradeOptions({ checkingOutPlan, onCheckout }) {
-  const plans = [
-    { key: "STARTER", name: "Starter", price: "Rs. 799/mo", detail: "10 reports, 5,000 rows, exports, advanced AI" },
-    { key: "GROWTH", name: "Growth", price: "Rs. 1,999/mo", detail: "50 reports, 25,000 rows, exports, advanced AI" },
-    { key: "PRO", name: "Pro", price: "Rs. 4,999/mo", detail: "Unlimited reports, 100,000 rows, exports, advanced AI" }
-  ];
-
-  return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {plans.map((plan) => (
-        <div key={plan.key} className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-black/5">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
-              <p className="mt-1 text-2xl font-bold text-emerald-700">{plan.price}</p>
-            </div>
-            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Paid</span>
-          </div>
-          <p className="mt-3 min-h-[40px] text-sm text-slate-500">{plan.detail}</p>
-          <button
-            type="button"
-            onClick={() => onCheckout(plan.key)}
-            disabled={checkingOutPlan === plan.key}
-            className="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
-          >
-            {checkingOutPlan === plan.key ? "Opening checkout..." : `Upgrade to ${plan.name}`}
-          </button>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function FileUploader({ title, helper, templateKey, requiredColumns, onUpload, onRemove, rowsCount, currentTotalRows, maxRows }) {
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [fileName, setFileName] = useState("");
-  const inputId = `upload-${templateKey}`;
-
-  return (
-    <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 transition hover:border-emerald-300 hover:bg-emerald-50/40">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <span className="rounded-full bg-white px-2 py-1 text-[11px] font-medium text-slate-600">{rowsCount} rows</span>
-      </div>
-      <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
-      <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
-      {fileName && (
-        <div className="mt-3 rounded-2xl bg-white px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-100">
-          <span className="font-semibold text-slate-800">File:</span> {fileName}
-        </div>
-      )}
-      <div className="mt-3 flex flex-col gap-2">
-        <label
-          htmlFor={inputId}
-          className="flex cursor-pointer flex-col items-center justify-center rounded-3xl border border-dashed border-emerald-200 bg-white px-4 py-5 text-center transition hover:border-emerald-400 hover:bg-emerald-50"
-        >
-          <Upload className="h-5 w-5 text-emerald-600" />
-          <span className="mt-2 text-sm font-semibold text-slate-900">
-            {fileName ? "Replace CSV file" : "Add CSV file"}
-          </span>
-          <span className="mt-1 text-xs text-slate-500">
-            Click to upload a .csv file
-          </span>
-        </label>
-        <input
-          id={inputId}
-          key={fileName || "empty-file"}
-          type="file"
-          accept=".csv"
-          className="sr-only"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            setFileName(file.name);
-            const reader = new FileReader();
-            reader.onload = () => {
-              try {
-                const parsed = parseCSV(String(reader.result));
-
-if (!parsed.length) {
-  throw new Error("CSV file is empty.");
-}
-
-const mappedRows = autoMapCsvRows(parsed, requiredColumns);
-const nextTotalRows = Number(currentTotalRows || 0) - Number(rowsCount || 0) + mappedRows.length;
-
-if (nextTotalRows > Number(maxRows || 0)) {
-  throw new Error(`This upload would use ${nextTotalRows} CSV rows. Your plan allows up to ${maxRows} rows.`);
-}
-
-const availableColumns = Object.keys(mappedRows[0] || {});
-const missing = requiredColumns.filter(
-  (column) => !availableColumns.includes(column)
-);
-
-if (missing.length) {
-  throw new Error(
-    `Missing columns: ${missing.join(", ")}. If this is a Shopify file, make sure it contains SKU, quantity, and price columns.`
-  );
-}
-
-setError("");
-setSuccess("CSV uploaded successfully. ProfitLens auto-mapped columns when needed.");
-onUpload(mappedRows);
-              } catch (err) {
-                setFileName("");
-                setError(err.message || "Could not read CSV file.");
-              }
-            };
-            reader.onerror = () => setError("Could not read this file.");
-            reader.readAsText(file);
-          }}
-        />
-        <button onClick={() => downloadTemplate(templateKey)} className="text-xs text-left font-medium underline underline-offset-4 text-slate-600">
-          Download sample template
-        </button>
-        {fileName && (
-          <button
-            type="button"
-            onClick={() => {
-              setFileName("");
-              setError("");
-              setSuccess("");
-              onRemove();
-            }}
-            className="inline-flex items-center justify-center rounded-2xl border border-red-100 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
-          >
-            <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-            Remove file
-          </button>
-        )}
-      </div>
-      {error && <p className="text-xs text-red-600 mt-2">{error}</p>}
-      {success && <p className="mt-2 text-xs text-emerald-600">{success}</p>}
     </div>
   );
 }
@@ -1672,55 +2116,4 @@ function SmallList({ title, items, empty, kind, settings }) {
     </Card>
     
   );
-  function ReportMetric({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) {
-  return (
-    <div className="rounded-3xl bg-slate-50 p-5">
-      <p className="text-sm text-slate-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
-function ReportList({
-  title,
-  items,
-  empty,
-  valueLabel,
-  valueGetter,
-}: {
-  title: string;
-  items: any[];
-  empty: string;
-  valueLabel: string;
-  valueGetter: (item: any) => string;
-}) {
-  return (
-    <div className="rounded-3xl bg-slate-50 p-5">
-      <h3 className="text-lg font-bold text-slate-900">{title}</h3>
-
-      {items.length === 0 ? (
-        <p className="mt-3 text-sm text-slate-500">{empty}</p>
-      ) : (
-        <div className="mt-4 space-y-3">
-          {items.slice(0, 5).map((item: any) => (
-            <div key={item.sku} className="rounded-2xl bg-white p-3 text-sm">
-              <p className="font-semibold text-slate-900">{item.product}</p>
-              <p className="mt-1 text-xs text-slate-500">{item.sku}</p>
-              <p className="mt-2 text-slate-700">
-                {valueLabel}:{" "}
-                <span className="font-semibold">{valueGetter(item)}</span>
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 }

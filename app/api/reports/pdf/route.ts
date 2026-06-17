@@ -55,15 +55,39 @@ export async function POST(request: Request) {
       );
     }
 
-    const { summary, rows = [] } = await request.json();
+    const { summary, rows = [], topFixes = [], actionPlan = {}, consultantNotes } = await request.json();
+    const actionLines = [
+      ["Stop ads", actionPlan.stopAds],
+      ["Increase price", actionPlan.increasePrice],
+      ["Reduce discount", actionPlan.reduceDiscount],
+      ["Fix returns", actionPlan.fixReturns],
+      ["Promote winners", actionPlan.promoteWinners]
+    ].flatMap(([title, items]) => {
+      const list = Array.isArray(items) ? items.slice(0, 3) : [];
+      if (!list.length) return [];
+      return [
+        String(title),
+        ...list.map((item: Record<string, unknown>) => `- ${item.product || item.sku}: ${item.detail || ""}`)
+      ];
+    });
+
     const lines = [
       "ProfitLens Profit Report",
       "",
       summary?.storeName ? `Store: ${summary.storeName}` : "Store: ProfitLens workspace",
+      summary?.clientName ? `Client: ${summary.clientName}` : "",
       summary?.generatedAt ? `Generated: ${summary.generatedAt}` : `Generated: ${new Date().toLocaleString()}`,
       summary?.revenue ? `Revenue: ${summary.revenue}` : "",
       summary?.profit ? `Real profit: ${summary.profit}` : "",
       summary?.margin ? `Net margin: ${summary.margin}` : "",
+      "",
+      "Top fixes",
+      ...topFixes.slice(0, 5).map((fix: string) => `- ${fix}`),
+      "",
+      "Action plan",
+      ...actionLines,
+      "",
+      consultantNotes ? `Consultant notes: ${consultantNotes}` : "",
       "",
       "Top products",
       ...rows.slice(0, 12).map((row: Record<string, unknown>, index: number) =>
