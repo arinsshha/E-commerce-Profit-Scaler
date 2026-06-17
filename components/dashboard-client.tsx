@@ -175,6 +175,11 @@ function downloadTemplate(templateKey) {
   downloadFile(template.filename, toCSV(template.rows));
 }
 
+function trackEvent(event, properties = {}) {
+  if (typeof window === "undefined") return;
+  window.posthog?.capture?.(event, properties);
+}
+
 function normalizeSku(value) {
   return String(value || "").trim().toUpperCase();
 }
@@ -598,17 +603,42 @@ if (missing.length) {
 
 setError("");
 setSuccess("CSV uploaded successfully. ProfitLens auto-mapped columns when needed.");
+trackEvent("csv_uploaded", {
+  uploadType: templateKey,
+  fileName: file.name,
+  rows: mappedRows.length,
+  totalRows: nextTotalRows
+});
 onUpload(mappedRows);
               } catch (err) {
                 setFileName("");
-                setError(err.message || "Could not read CSV file.");
+                const message = err.message || "Could not read CSV file.";
+                setError(message);
+                trackEvent("csv_upload_failed", {
+                  uploadType: templateKey,
+                  fileName: file.name,
+                  reason: message
+                });
               }
             };
-            reader.onerror = () => setError("Could not read this file.");
+            reader.onerror = () => {
+              setError("Could not read this file.");
+              trackEvent("csv_upload_failed", {
+                uploadType: templateKey,
+                fileName: file.name,
+                reason: "reader_error"
+              });
+            };
             reader.readAsText(file);
           }}
         />
-        <button onClick={() => downloadTemplate(templateKey)} className="text-xs text-left font-medium underline underline-offset-4 text-slate-600">
+        <button
+          onClick={() => {
+            trackEvent("csv_template_downloaded", { uploadType: templateKey });
+            downloadTemplate(templateKey);
+          }}
+          className="text-xs text-left font-medium underline underline-offset-4 text-slate-600"
+        >
           Download sample template
         </button>
         {fileName && (
@@ -618,6 +648,7 @@ onUpload(mappedRows);
               setFileName("");
               setError("");
               setSuccess("");
+              trackEvent("csv_removed", { uploadType: templateKey });
               onRemove();
             }}
             className="inline-flex items-center justify-center rounded-2xl border border-red-100 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50"
@@ -633,7 +664,14 @@ onUpload(mappedRows);
   );
 }
 
-export function DashboardClient({ initialReports = [], userPlan = "FREE", reportsUsedThisMonth = 0 } = {}) {
+export function DashboardClient({
+  initialReports = [],
+  userPlan = "FREE",
+  reportsUsedThisMonth = 0,
+  userId = "",
+  userEmail = "",
+  userName = ""
+} = {}) {
   const [orders, setOrders] = useState(sampleOrders);
   const [costs, setCosts] = useState(sampleCosts);
   const [ads, setAds] = useState(sampleAds);
@@ -667,6 +705,24 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
 
   const planConfig = useMemo(() => getPlanConfig(userPlan), [userPlan]);
   const planIsPaid = userPlan !== "FREE";
+
+  useEffect(() => {
+    if (userId) {
+      window.posthog?.identify?.(userId, {
+        email: userEmail,
+        name: userName,
+        plan: userPlan
+      });
+    }
+
+    if (userEmail) {
+      window.$crisp?.push?.(["set", "user:email", [userEmail]]);
+    }
+
+    if (userName) {
+      window.$crisp?.push?.(["set", "user:nickname", [userName]]);
+    }
+  }, [userId, userEmail, userName, userPlan]);
 
   useEffect(() => {
     try {
@@ -1120,6 +1176,10 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
 
   const exportAnalysis = async () => {
     setExporting("csv");
+    trackEvent("report_csv_clicked", {
+      rowCount: analysis.products.length,
+      plan: userPlan
+    });
     try {
       const rows = exportRows();
       const response = await fetch("/api/reports/export", {
@@ -1134,7 +1194,12 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
       }
 
       downloadFile("profitlens_analysis_report.csv", toCSV(rows));
+      trackEvent("report_csv_exported", { rowCount: rows.length, plan: userPlan });
     } catch (error) {
+      trackEvent("report_csv_failed", {
+        reason: error?.message || "Could not export CSV.",
+        plan: userPlan
+      });
       alert(error?.message || "Could not export CSV.");
     } finally {
       setExporting("");
@@ -1143,6 +1208,10 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
 
   const exportPdf = async () => {
     setExporting("pdf");
+    trackEvent("report_pdf_clicked", {
+      rowCount: analysis.products.length,
+      plan: userPlan
+    });
     try {
       const rows = exportRows();
       const response = await fetch("/api/reports/pdf", {
@@ -1178,7 +1247,12 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      trackEvent("report_pdf_exported", { rowCount: rows.length, plan: userPlan });
     } catch (error) {
+      trackEvent("report_pdf_failed", {
+        reason: error?.message || "Could not export PDF.",
+        plan: userPlan
+      });
       alert(error?.message || "Could not export PDF.");
     } finally {
       setExporting("");
@@ -1187,11 +1261,13 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
 
   const generateAdvancedAI = async () => {
     if (!planIsPaid) {
+      trackEvent("advanced_ai_blocked", { plan: userPlan });
       alert("Advanced AI suggestions are available on paid plans. Free plan includes simple rule-based suggestions.");
       return;
     }
 
     setAiLoading(true);
+    trackEvent("advanced_ai_requested", { plan: userPlan });
     try {
       const response = await fetch("/api/ai-suggestions", {
         method: "POST",
@@ -1211,7 +1287,12 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
           action: item.action || "Review this recommendation."
         }))
       );
+      trackEvent("advanced_ai_generated", { plan: userPlan });
     } catch (error) {
+      trackEvent("advanced_ai_failed", {
+        reason: error?.message || "Could not generate AI suggestions.",
+        plan: userPlan
+      });
       alert(error?.message || "Could not generate AI suggestions.");
     } finally {
       setAiLoading(false);
@@ -1227,11 +1308,13 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
     const priceId = priceIds[plan];
 
     if (!priceId) {
+      trackEvent("checkout_blocked_missing_price", { plan });
       alert("Stripe price ID is not configured for this plan yet. Use admin grant access or add Stripe price IDs in environment variables.");
       return;
     }
 
     setCheckingOutPlan(plan);
+    trackEvent("checkout_started", { plan });
     try {
       const response = await fetch("/api/stripe/checkout", {
         method: "POST",
@@ -1246,6 +1329,10 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
 
       window.location.href = data.url;
     } catch (error) {
+      trackEvent("checkout_failed", {
+        plan,
+        reason: error?.message || "Could not start checkout."
+      });
       alert(error?.message || "Could not start checkout.");
     } finally {
       setCheckingOutPlan("");
@@ -1254,6 +1341,10 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
 
   const saveReport = async () => {
     setSaving(true);
+    trackEvent("report_save_started", {
+      plan: userPlan,
+      totalRows: orders.length + costs.length + ads.length + shipping.length + returns.length
+    });
     try {
       const response = await fetch("/api/reports", {
         method: "POST",
@@ -1283,8 +1374,17 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
 
       setReports((current) => [data.report, ...current]);
       setCurrentReportId(data.report.id || data.report.title || "");
+      trackEvent("report_saved", {
+        plan: userPlan,
+        reportId: data.report.id,
+        totalRows: orders.length + costs.length + ads.length + shipping.length + returns.length
+      });
       alert("Report saved successfully.");
     } catch (error) {
+      trackEvent("report_save_failed", {
+        plan: userPlan,
+        reason: error?.message || "Could not save report."
+      });
       alert(error?.message || "Could not save report.");
     } finally {
       setSaving(false);

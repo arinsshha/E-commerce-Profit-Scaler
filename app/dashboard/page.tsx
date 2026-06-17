@@ -57,6 +57,9 @@ export default async function DashboardPage() {
           initialReports={JSON.parse(JSON.stringify(reports))}
           userPlan={user.plan}
           reportsUsedThisMonth={reportsUsedThisMonth}
+          userId={user.id}
+          userEmail={user.email || ""}
+          userName={user.name || ""}
         />
       </div>
     </main>

@@ -5,6 +5,8 @@ import { assertCanCreateReport } from "@/lib/limits";
 import type { PlanName } from "@/lib/app-config";
 import { ReportSchema } from "@/lib/report-schema";
 import type { Prisma } from "@prisma/client";
+import { sendReportReadyEmail } from "@/lib/brevo";
+import { captureServerEvent } from "@/lib/posthog";
 
 export async function GET() {
   try {
@@ -51,6 +53,20 @@ export async function POST(request: Request) {
         analysis: body.analysis as unknown as Prisma.InputJsonValue
       }
     });
+
+    await Promise.all([
+      sendReportReadyEmail({ user, reportTitle: report.title }),
+      captureServerEvent({
+        distinctId: user.id,
+        event: "report_generated",
+        properties: {
+          reportId: report.id,
+          reportTitle: report.title,
+          plan: user.plan,
+          totalRows
+        }
+      })
+    ]);
 
     return NextResponse.json({ report });
   } catch (error: unknown) {

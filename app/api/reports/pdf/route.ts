@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAppUser } from "@/lib/auth";
 import { canExport } from "@/lib/limits";
 import type { PlanName } from "@/lib/app-config";
+import { captureServerEvent } from "@/lib/posthog";
 
 function escapePdfText(value: unknown) {
   return String(value ?? "")
@@ -96,6 +97,16 @@ export async function POST(request: Request) {
     ].filter(Boolean);
 
     const pdf = buildSimplePdf(lines);
+
+    await captureServerEvent({
+      distinctId: user.id,
+      event: "report_pdf_clicked",
+      properties: {
+        plan: user.plan,
+        rowCount: Array.isArray(rows) ? rows.length : 0,
+        storeName: summary?.storeName || null
+      }
+    });
 
     return new NextResponse(pdf, {
       headers: {
