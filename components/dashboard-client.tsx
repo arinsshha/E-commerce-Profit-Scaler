@@ -1366,8 +1366,8 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
   };
 
   return (
-    <div className={`dashboard-shell min-h-screen bg-[#eef1f5] text-slate-950 p-5 md:p-8 ${dashboardTheme === "dark" ? "dashboard-dark" : "dashboard-light"}`}>
-      <div className="max-w-[1500px] mx-auto space-y-6">
+    <div className={`dashboard-shell min-h-screen bg-[#eef1f5] text-slate-950 p-0 sm:p-5 md:p-8 ${dashboardTheme === "dark" ? "dashboard-dark" : "dashboard-light"}`}>
+      <div className="mx-auto max-w-[1500px] min-w-0 space-y-6">
         <motion.section
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1673,18 +1673,18 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
           </Card>
         </section>
 
-        <section className="grid gap-6 xl:grid-cols-[1.45fr_0.9fr]">
-          <div className="space-y-6">
+        <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(0,0.9fr)]">
+          <div className="min-w-0 space-y-6">
             <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
               <CardContent className="p-6">
-                <div className="mb-5 flex items-center justify-between">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">Upload Store Data</h2>
                     <p className="text-sm text-slate-500">Upload all 5 CSV files for a complete profit audit.</p>
                   </div>
                   <div className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600">CSV only</div>
                 </div>
-                <div className="mb-5 rounded-[24px] bg-slate-50 p-4">
+                <div className="mb-5 min-w-0 rounded-[24px] bg-slate-50 p-4">
                   <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Platform preset</p>
                   <div className="flex flex-wrap gap-2">
                     {[
@@ -1734,14 +1734,14 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
 
             <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
               <CardContent className="p-6">
-                <div className="mb-5 flex items-center justify-between">
+                <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-xl font-bold text-slate-900">Revenue Trend</h2>
                     <p className="text-sm text-slate-500">Revenue timeline from uploaded orders.</p>
                   </div>
                   <div className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600">Live</div>
                 </div>
-                <div className="h-72">
+                <div className="h-72 min-w-0 overflow-hidden">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={analysis.daily}>
                       <XAxis dataKey="date" tick={{ fontSize: 11 }} />
@@ -1788,7 +1788,7 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
             </Card>
           </div>
 
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-6">
             <InsightCard
               title={planIsPaid ? "Advanced AI Suggestions" : "Simple Business Suggestions"}
               suggestions={advancedSuggestions || suggestions}
@@ -1955,7 +1955,7 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
                   No saved reports yet.
                 </div>
               ) : (
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid min-w-0 gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {reports.map((report) => (
                     <div
                       key={report.id || report.title}

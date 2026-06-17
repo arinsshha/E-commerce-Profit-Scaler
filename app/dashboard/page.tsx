@@ -28,18 +28,18 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen bg-[#eef1f5] p-5 md:p-8">
       <div className="mx-auto max-w-[1500px] space-y-6">
-        <header className="flex items-center justify-between rounded-[24px] bg-white px-5 py-4 shadow-sm ring-1 ring-black/5">
-          <div>
+        <header className="flex flex-col gap-4 rounded-[24px] bg-white px-5 py-4 shadow-sm ring-1 ring-black/5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-slate-900">
               ProfitLens Workspace
             </p>
-            <p className="text-xs text-slate-500">
+            <p className="break-words text-xs text-slate-500">
               {user.email || "user"} · Plan: {user.plan} · Support:{" "}
               {appConfig.temporarySupportEmail}
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <DashboardThemeToggle />
             {user.email === process.env.ADMIN_EMAIL && (
               <Link

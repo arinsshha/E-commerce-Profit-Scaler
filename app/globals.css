@@ -30,6 +30,22 @@ textarea {
 
 .dashboard-shell {
   transition: background-color 320ms ease, color 320ms ease;
+  overflow-x: hidden;
+}
+
+.dashboard-shell .grid > *,
+.dashboard-shell .flex > * {
+  min-width: 0;
+}
+
+.dashboard-shell table {
+  max-width: none;
+}
+
+.dashboard-shell .recharts-responsive-container,
+.dashboard-shell .recharts-wrapper,
+.dashboard-shell .recharts-surface {
+  max-width: 100%;
 }
 
 .dashboard-shell *,
