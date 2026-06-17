@@ -3,6 +3,7 @@ import Link from "next/link";
 import { requireAppUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { DashboardClient } from "@/components/dashboard-client";
+import { DashboardThemeToggle } from "@/components/dashboard-theme-toggle";
 import { appConfig } from "@/lib/app-config";
 import { getReportsUsedThisMonth } from "@/lib/limits";
 
@@ -39,6 +40,7 @@ export default async function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-3">
+            <DashboardThemeToggle />
             {user.email === process.env.ADMIN_EMAIL && (
               <Link
                 href="/admin"

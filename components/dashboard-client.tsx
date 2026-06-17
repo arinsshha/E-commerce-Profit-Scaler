@@ -37,8 +37,9 @@ import { FeatureLock } from "@/components/feature-lock";
 import { analyzeProfit } from "@/lib/profit";
 import { getPlanConfig } from "@/lib/app-config";
 
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.2.1";
 const STORAGE_KEY = "profitlens_real_world_mvp_v2";
+const THEME_EVENT = "profitlens-dashboard-theme";
 
 const sampleOrders = [
   { orderId: "ORD-001", date: "2026-05-01", product: "Gold Plated Bracelet", sku: "BR-001", quantity: 2, sellingPrice: 899, discount: 100, paymentFee: 32 },
@@ -646,6 +647,7 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
   const [consultantNotes, setConsultantNotes] = useState("");
   const [workspaceMode, setWorkspaceMode] = useState("demo");
   const [uploadPreset, setUploadPreset] = useState("custom");
+  const [dashboardTheme, setDashboardTheme] = useState("light");
   const [simulator, setSimulator] = useState({
     priceChange: 0,
     adSpendChange: 0,
@@ -682,15 +684,37 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
       setConsultantNotes(parsed.consultantNotes || "");
       setWorkspaceMode(parsed.workspaceMode || "demo");
       setUploadPreset(parsed.uploadPreset || "custom");
+      setDashboardTheme(parsed.dashboardTheme === "dark" ? "dark" : "light");
     } catch {
       // Ignore invalid local data.
     }
   }, []);
 
   useEffect(() => {
-    const payload = { orders, costs, ads, shipping, returns, settings, storeName, clientName, consultantNotes, workspaceMode, uploadPreset, version: APP_VERSION };
+    const payload = { orders, costs, ads, shipping, returns, settings, storeName, clientName, consultantNotes, workspaceMode, uploadPreset, dashboardTheme, version: APP_VERSION };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-  }, [orders, costs, ads, shipping, returns, settings, storeName, clientName, consultantNotes, workspaceMode, uploadPreset]);
+  }, [orders, costs, ads, shipping, returns, settings, storeName, clientName, consultantNotes, workspaceMode, uploadPreset, dashboardTheme]);
+
+  useEffect(() => {
+    document.body.classList.toggle("dashboard-page-dark", dashboardTheme === "dark");
+    document.body.classList.toggle("dashboard-page-light", dashboardTheme !== "dark");
+
+    return () => {
+      document.body.classList.remove("dashboard-page-dark", "dashboard-page-light");
+    };
+  }, [dashboardTheme]);
+
+  useEffect(() => {
+    const handleThemeChange = (event: Event) => {
+      const nextTheme = (event as CustomEvent).detail?.theme;
+      if (nextTheme === "light" || nextTheme === "dark") {
+        setDashboardTheme(nextTheme);
+      }
+    };
+
+    window.addEventListener(THEME_EVENT, handleThemeChange);
+    return () => window.removeEventListener(THEME_EVENT, handleThemeChange);
+  }, []);
 
   const analysis = useMemo(() => {
     const profitAnalysis = analyzeProfit({
@@ -1342,7 +1366,7 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
   };
 
   return (
-    <div className="min-h-screen bg-[#eef1f5] text-slate-950 p-5 md:p-8">
+    <div className={`dashboard-shell min-h-screen bg-[#eef1f5] text-slate-950 p-5 md:p-8 ${dashboardTheme === "dark" ? "dashboard-dark" : "dashboard-light"}`}>
       <div className="max-w-[1500px] mx-auto space-y-6">
         <motion.section
           initial={{ opacity: 0, y: 12 }}

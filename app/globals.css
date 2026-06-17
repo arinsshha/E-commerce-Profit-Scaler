@@ -27,6 +27,225 @@ textarea {
   background: #10b981;
   color: white;
 }
+
+.dashboard-shell {
+  transition: background-color 320ms ease, color 320ms ease;
+}
+
+.dashboard-shell *,
+.dashboard-page-dark main,
+.dashboard-page-dark main > div > header,
+.dashboard-page-light main,
+.dashboard-page-light main > div > header {
+  transition-property: background-color, border-color, color, box-shadow, filter;
+  transition-duration: 320ms;
+  transition-timing-function: ease;
+}
+
+.dashboard-theme-animating::before {
+  animation: dashboard-theme-sweep 720ms ease both;
+  background:
+    radial-gradient(circle at 85% 7%, rgba(16, 185, 129, 0.22), transparent 30%),
+    linear-gradient(120deg, rgba(255, 255, 255, 0.16), rgba(15, 23, 42, 0.14));
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: fixed;
+  z-index: 9999;
+}
+
+@keyframes dashboard-theme-sweep {
+  0% {
+    clip-path: circle(0% at 85% 7%);
+    opacity: 0.9;
+  }
+
+  55% {
+    clip-path: circle(145% at 85% 7%);
+    opacity: 0.5;
+  }
+
+  100% {
+    clip-path: circle(145% at 85% 7%);
+    opacity: 0;
+  }
+}
+
+.dashboard-page-dark {
+  background: #080f1f !important;
+  color-scheme: dark;
+}
+
+.dashboard-page-dark main {
+  background: #080f1f !important;
+}
+
+.dashboard-page-dark main > div > header {
+  background-color: #111827 !important;
+  color: #f8fafc !important;
+  --tw-ring-color: rgba(148, 163, 184, 0.24) !important;
+}
+
+.dashboard-page-dark main > div > header .text-slate-900 {
+  color: #f8fafc !important;
+}
+
+.dashboard-page-dark main > div > header .text-slate-500 {
+  color: #cbd5e1 !important;
+}
+
+.dashboard-page-dark .dashboard-theme-toggle {
+  background-color: #1f2937 !important;
+  color: #cbd5e1 !important;
+}
+
+.dashboard-page-dark .dashboard-theme-toggle button[aria-pressed="true"] {
+  background-color: #020617 !important;
+  color: #f8fafc !important;
+}
+
+.dashboard-dark {
+  background: #080f1f !important;
+  color: #e5e7eb !important;
+  color-scheme: dark;
+}
+
+.dashboard-dark .bg-white {
+  background-color: #111827 !important;
+}
+
+.dashboard-dark .bg-slate-50,
+.dashboard-dark .bg-slate-100 {
+  background-color: #1f2937 !important;
+}
+
+.dashboard-dark .bg-emerald-50 {
+  background-color: rgba(6, 78, 59, 0.35) !important;
+}
+
+.dashboard-dark .bg-yellow-100,
+.dashboard-dark .bg-yellow-50 {
+  background-color: rgba(113, 63, 18, 0.35) !important;
+}
+
+.dashboard-dark .bg-emerald-100 {
+  background-color: rgba(6, 95, 70, 0.45) !important;
+}
+
+.dashboard-dark .bg-sky-100,
+.dashboard-dark .bg-sky-50 {
+  background-color: rgba(12, 74, 110, 0.42) !important;
+}
+
+.dashboard-dark .bg-violet-100 {
+  background-color: rgba(76, 29, 149, 0.42) !important;
+}
+
+.dashboard-dark .bg-amber-100,
+.dashboard-dark .bg-amber-50 {
+  background-color: rgba(120, 53, 15, 0.42) !important;
+}
+
+.dashboard-dark .bg-red-100,
+.dashboard-dark .bg-red-50 {
+  background-color: rgba(127, 29, 29, 0.42) !important;
+}
+
+.dashboard-dark .bg-orange-100,
+.dashboard-dark .bg-orange-50 {
+  background-color: rgba(124, 45, 18, 0.42) !important;
+}
+
+.dashboard-dark .text-emerald-700,
+.dashboard-dark .text-emerald-800 {
+  color: #86efac !important;
+}
+
+.dashboard-dark .text-sky-700 {
+  color: #7dd3fc !important;
+}
+
+.dashboard-dark .text-violet-700 {
+  color: #c4b5fd !important;
+}
+
+.dashboard-dark .text-amber-700,
+.dashboard-dark .text-amber-800,
+.dashboard-dark .text-yellow-800,
+.dashboard-dark .text-yellow-900 {
+  color: #fde68a !important;
+}
+
+.dashboard-dark .text-red-600,
+.dashboard-dark .text-red-700 {
+  color: #fca5a5 !important;
+}
+
+.dashboard-dark .text-orange-800 {
+  color: #fdba74 !important;
+}
+
+.dashboard-dark .ring-red-100,
+.dashboard-dark .ring-amber-100,
+.dashboard-dark .ring-sky-100,
+.dashboard-dark .ring-orange-100,
+.dashboard-dark .ring-emerald-100,
+.dashboard-dark .ring-yellow-100 {
+  --tw-ring-color: rgba(148, 163, 184, 0.22) !important;
+}
+
+.dashboard-dark .text-slate-950,
+.dashboard-dark .text-slate-900,
+.dashboard-dark .text-slate-800,
+.dashboard-dark .text-slate-700 {
+  color: #f8fafc !important;
+}
+
+.dashboard-dark .text-slate-600,
+.dashboard-dark .text-slate-500,
+.dashboard-dark .text-slate-400 {
+  color: #cbd5e1 !important;
+}
+
+.dashboard-dark .border-slate-100,
+.dashboard-dark .border-slate-200,
+.dashboard-dark .ring-slate-100,
+.dashboard-dark .ring-black\/5 {
+  border-color: rgba(148, 163, 184, 0.24) !important;
+  --tw-ring-color: rgba(148, 163, 184, 0.24) !important;
+}
+
+.dashboard-dark input,
+.dashboard-dark select,
+.dashboard-dark textarea {
+  background-color: #0f172a !important;
+  border-color: rgba(148, 163, 184, 0.3) !important;
+  color: #f8fafc !important;
+}
+
+.dashboard-dark input::placeholder,
+.dashboard-dark textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+.dashboard-dark table tr {
+  border-color: rgba(148, 163, 184, 0.18) !important;
+}
+
+.dashboard-dark .recharts-default-tooltip {
+  background-color: #0f172a !important;
+  border-color: rgba(148, 163, 184, 0.3) !important;
+  color: #f8fafc !important;
+}
+
+.dashboard-dark .recharts-cartesian-axis-tick-value {
+  fill: #cbd5e1 !important;
+}
+
+.dashboard-dark button:hover {
+  filter: brightness(1.08);
+}
+
 @media print {
   body {
     background: white !important;
