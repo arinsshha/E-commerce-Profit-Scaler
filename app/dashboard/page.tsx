@@ -4,21 +4,25 @@ import { requireAppUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { DashboardClient } from "@/components/dashboard-client";
 import { appConfig } from "@/lib/app-config";
+import { getReportsUsedThisMonth } from "@/lib/limits";
 
 export default async function DashboardPage() {
   const user = await requireAppUser();
 
-  const reports = await prisma.report.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
-    take: 12,
-    select: {
-      id: true,
-      title: true,
-      createdAt: true,
-      analysis: true,
-    },
-  });
+  const [reports, reportsUsedThisMonth] = await Promise.all([
+    prisma.report.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      take: 12,
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        analysis: true,
+      },
+    }),
+    getReportsUsedThisMonth(user.id)
+  ]);
 
   return (
     <main className="min-h-screen bg-[#eef1f5] p-5 md:p-8">
@@ -50,6 +54,7 @@ export default async function DashboardPage() {
         <DashboardClient
           initialReports={JSON.parse(JSON.stringify(reports))}
           userPlan={user.plan}
+          reportsUsedThisMonth={reportsUsedThisMonth}
         />
       </div>
     </main>

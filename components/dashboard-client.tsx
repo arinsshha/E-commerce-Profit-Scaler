@@ -36,6 +36,7 @@ import { Button } from "@/components/ui/button";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 import { FeatureLock } from "@/components/feature-lock";
 import { analyzeProfit } from "@/lib/profit";
+import { getPlanConfig } from "@/lib/app-config";
 
 const APP_VERSION = "1.1.0";
 const STORAGE_KEY = "profitlens_real_world_mvp_v2";
@@ -411,7 +412,7 @@ if (isCostUpload) {
   return rows;
 }
 
-export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {}) {
+export function DashboardClient({ initialReports = [], userPlan = "FREE", reportsUsedThisMonth = 0 } = {}) {
   const [orders, setOrders] = useState(sampleOrders);
   const [costs, setCosts] = useState(sampleCosts);
   const [ads, setAds] = useState(sampleAds);
@@ -426,6 +427,13 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
   const [reports, setReports] = useState(initialReports || []);
   const [saving, setSaving] = useState(false);
   const [openingReportId, setOpeningReportId] = useState("");
+  const [exporting, setExporting] = useState("");
+  const [advancedSuggestions, setAdvancedSuggestions] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [checkingOutPlan, setCheckingOutPlan] = useState("");
+
+  const planConfig = useMemo(() => getPlanConfig(userPlan), [userPlan]);
+  const planIsPaid = userPlan !== "FREE";
 
   useEffect(() => {
     try {
@@ -649,6 +657,27 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
     return [...analysis.products].sort((a, b) => b.realProfit - a.realProfit).slice(0, 6);
   }, [analysis.products]);
 
+  const totalUploadedRows = orders.length + costs.length + ads.length + shipping.length + returns.length;
+  const maxCsvRows = Number(planConfig.maxCsvRows);
+  const reportLimitLabel = planConfig.reportsPerMonth === "unlimited" ? "Unlimited" : `${reportsUsedThisMonth}/${planConfig.reportsPerMonth}`;
+  const csvLimitLabel = `${totalUploadedRows}/${planConfig.maxCsvRows}`;
+
+  const exportRows = () =>
+    analysis.products.map((p) => ({
+      sku: p.sku,
+      product: p.product,
+      revenue: Math.round(p.revenue),
+      totalCost: Math.round(p.totalCost),
+      realProfit: Math.round(p.realProfit),
+      marginPercent: p.margin.toFixed(2),
+      unitsSold: p.unitsSold,
+      returnedUnits: p.returnedUnits,
+      returnRatePercent: p.returnRate.toFixed(2),
+      breakEvenPrice: Math.round(p.breakEvenPrice),
+      suggestedPrice: Math.round(p.suggestedPrice),
+      status: getHealthStatus(p, settings).label
+    }));
+
   const resetDemoData = () => {
     setOrders(sampleOrders);
     setCosts(sampleCosts);
@@ -663,22 +692,134 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
     setConsultantNotes("");
   };
 
-  const exportAnalysis = () => {
-    const rows = analysis.products.map((p) => ({
-      sku: p.sku,
-      product: p.product,
-      revenue: Math.round(p.revenue),
-      totalCost: Math.round(p.totalCost),
-      realProfit: Math.round(p.realProfit),
-      marginPercent: p.margin.toFixed(2),
-      unitsSold: p.unitsSold,
-      returnedUnits: p.returnedUnits,
-      returnRatePercent: p.returnRate.toFixed(2),
-      breakEvenPrice: Math.round(p.breakEvenPrice),
-      suggestedPrice: Math.round(p.suggestedPrice),
-      status: getHealthStatus(p, settings).label
-    }));
-    downloadFile("profitlens_analysis_report.csv", toCSV(rows));
+  const exportAnalysis = async () => {
+    setExporting("csv");
+    try {
+      const rows = exportRows();
+      const response = await fetch("/api/reports/export", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "CSV export is available on paid plans.");
+      }
+
+      downloadFile("profitlens_analysis_report.csv", toCSV(rows));
+    } catch (error) {
+      alert(error?.message || "Could not export CSV.");
+    } finally {
+      setExporting("");
+    }
+  };
+
+  const exportPdf = async () => {
+    setExporting("pdf");
+    try {
+      const rows = exportRows();
+      const response = await fetch("/api/reports/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          rows,
+          summary: {
+            storeName,
+            generatedAt: new Date().toLocaleString(),
+            revenue: formatMoney(analysis.totals.revenue, settings),
+            profit: formatMoney(analysis.totals.realProfit, settings),
+            margin: formatPercent(analysis.totals.margin)
+          }
+        })
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "PDF export is available on paid plans.");
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "profitlens-report.pdf";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(error?.message || "Could not export PDF.");
+    } finally {
+      setExporting("");
+    }
+  };
+
+  const generateAdvancedAI = async () => {
+    if (!planIsPaid) {
+      alert("Advanced AI suggestions are available on paid plans. Free plan includes simple rule-based suggestions.");
+      return;
+    }
+
+    setAiLoading(true);
+    try {
+      const response = await fetch("/api/ai-suggestions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ analysis })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not generate AI suggestions.");
+      }
+
+      setAdvancedSuggestions(
+        (data.suggestions || []).map((item) => ({
+          ...item,
+          text: item.text || item.problem || "",
+          action: item.action || "Review this recommendation."
+        }))
+      );
+    } catch (error) {
+      alert(error?.message || "Could not generate AI suggestions.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const startStripeCheckout = async (plan) => {
+    const priceIds = {
+      STARTER: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_STARTER_INR,
+      GROWTH: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_GROWTH_INR,
+      PRO: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_PRO_INR
+    };
+    const priceId = priceIds[plan];
+
+    if (!priceId) {
+      alert("Stripe price ID is not configured for this plan yet. Use admin grant access or add Stripe price IDs in environment variables.");
+      return;
+    }
+
+    setCheckingOutPlan(plan);
+    try {
+      const response = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priceId })
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Checkout failed.");
+      }
+
+      window.location.href = data.url;
+    } catch (error) {
+      alert(error?.message || "Could not start checkout.");
+    } finally {
+      setCheckingOutPlan("");
+    }
   };
 
   const saveReport = async () => {
@@ -790,8 +931,8 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
                 <Button variant="outline" className="rounded-2xl border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100" onClick={resetDemoData}>
                   <RefreshCcw className="w-4 h-4 mr-2" /> Reset Demo
                 </Button>
-                <Button variant="outline" className="rounded-2xl border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100" onClick={exportAnalysis}>
-                  <Download className="w-4 h-4 mr-2" /> Export CSV
+                <Button variant="outline" className="rounded-2xl border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100" onClick={exportAnalysis} disabled={exporting === "csv"}>
+                  <Download className="w-4 h-4 mr-2" /> {exporting === "csv" ? "Exporting..." : "Export CSV"}
                 </Button>
                 <Button className="rounded-2xl bg-emerald-500 text-white hover:bg-emerald-600" onClick={() => window.print()}>
                   <FileText className="w-4 h-4 mr-2" /> Print Report
@@ -802,10 +943,11 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
                 <Button
   variant="outline"
   className="rounded-2xl border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-  onClick={() => window.print()}
+  onClick={exportPdf}
+  disabled={exporting === "pdf"}
 >
   <FileText className="mr-2 h-4 w-4" />
-  Export PDF
+  {exporting === "pdf" ? "Exporting..." : "Export PDF"}
 </Button>
               </div>
             </div>
@@ -818,6 +960,52 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
             </div>
           </div>
         </motion.section>
+
+        <section className="grid gap-4 lg:grid-cols-3">
+          <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
+            <CardContent className="p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-slate-500">Current Plan</p>
+                  <h2 className="mt-2 text-3xl font-bold text-slate-900">{planConfig.name}</h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    {planIsPaid ? "Exports and advanced AI are unlocked." : "Free plan includes one saved report and simple suggestions."}
+                  </p>
+                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-bold ${planIsPaid ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-700"}`}>
+                  {userPlan}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
+            <CardContent className="p-6">
+              <p className="text-sm font-medium text-slate-500">Monthly Reports</p>
+              <h2 className="mt-2 text-3xl font-bold text-slate-900">{reportLimitLabel}</h2>
+              <p className="mt-2 text-sm text-slate-500">Limits are enforced when saving a report.</p>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
+            <CardContent className="p-6">
+              <p className="text-sm font-medium text-slate-500">CSV Row Limit</p>
+              <h2 className="mt-2 text-3xl font-bold text-slate-900">{csvLimitLabel}</h2>
+              <p className="mt-2 text-sm text-slate-500">Uploads are blocked before they exceed your plan.</p>
+            </CardContent>
+          </Card>
+        </section>
+
+        {!planIsPaid && (
+          <div className="space-y-4">
+            <FeatureLock
+              title="Upgrade to unlock exports and advanced AI"
+              description="Paid plans unlock CSV export, PDF export, higher row limits, more saved reports, and advanced AI suggestions."
+              requiredPlan="Starter"
+            />
+            <UpgradeOptions checkingOutPlan={checkingOutPlan} onCheckout={startStripeCheckout} />
+          </div>
+        )}
 
        <section className="grid gap-6 xl:grid-cols-4">
           <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
@@ -949,11 +1137,11 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
                   <div className="rounded-2xl bg-slate-100 px-3 py-2 text-xs font-medium text-slate-600">CSV only</div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <FileUploader title="Orders CSV" helper="orderId,date,product,sku,quantity,sellingPrice,discount,paymentFee" templateKey="orders" requiredColumns={["sku", "quantity", "sellingPrice"]} rowsCount={orders.length} onUpload={setOrders} onRemove={() => setOrders([])} />
-                  <FileUploader title="Product Cost CSV" helper="sku,product,productCost,packagingCost" templateKey="costs" requiredColumns={["sku", "productCost"]} rowsCount={costs.length} onUpload={setCosts} onRemove={() => setCosts([])} />
-                  <FileUploader title="Ad Spend CSV" helper="sku,adSpend" templateKey="ads" requiredColumns={["sku", "adSpend"]} rowsCount={ads.length} onUpload={setAds} onRemove={() => setAds([])} />
-                  <FileUploader title="Shipping CSV" helper="sku,shippingCost" templateKey="shipping" requiredColumns={["sku", "shippingCost"]} rowsCount={shipping.length} onUpload={setShipping} onRemove={() => setShipping([])} />
-                  <FileUploader title="Returns CSV" helper="sku,returnedUnits" templateKey="returns" requiredColumns={["sku", "returnedUnits"]} rowsCount={returns.length} onUpload={setReturns} onRemove={() => setReturns([])} />
+                  <FileUploader title="Orders CSV" helper="orderId,date,product,sku,quantity,sellingPrice,discount,paymentFee" templateKey="orders" requiredColumns={["sku", "quantity", "sellingPrice"]} rowsCount={orders.length} currentTotalRows={totalUploadedRows} maxRows={maxCsvRows} onUpload={setOrders} onRemove={() => setOrders([])} />
+                  <FileUploader title="Product Cost CSV" helper="sku,product,productCost,packagingCost" templateKey="costs" requiredColumns={["sku", "productCost"]} rowsCount={costs.length} currentTotalRows={totalUploadedRows} maxRows={maxCsvRows} onUpload={setCosts} onRemove={() => setCosts([])} />
+                  <FileUploader title="Ad Spend CSV" helper="sku,adSpend" templateKey="ads" requiredColumns={["sku", "adSpend"]} rowsCount={ads.length} currentTotalRows={totalUploadedRows} maxRows={maxCsvRows} onUpload={setAds} onRemove={() => setAds([])} />
+                  <FileUploader title="Shipping CSV" helper="sku,shippingCost" templateKey="shipping" requiredColumns={["sku", "shippingCost"]} rowsCount={shipping.length} currentTotalRows={totalUploadedRows} maxRows={maxCsvRows} onUpload={setShipping} onRemove={() => setShipping([])} />
+                  <FileUploader title="Returns CSV" helper="sku,returnedUnits" templateKey="returns" requiredColumns={["sku", "returnedUnits"]} rowsCount={returns.length} currentTotalRows={totalUploadedRows} maxRows={maxCsvRows} onUpload={setReturns} onRemove={() => setReturns([])} />
                 </div>
               </CardContent>
             </Card>
@@ -1028,7 +1216,13 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE" } = {})
           </div>
 
           <div className="space-y-6">
-            <InsightCard title="AI Business Suggestions" suggestions={suggestions} />
+            <InsightCard
+              title={planIsPaid ? "Advanced AI Suggestions" : "Simple Business Suggestions"}
+              suggestions={advancedSuggestions || suggestions}
+              planIsPaid={planIsPaid}
+              aiLoading={aiLoading}
+              onGenerateAdvanced={generateAdvancedAI}
+            />
 
             <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
               <CardContent className="p-6">
@@ -1179,7 +1373,40 @@ function InfoMiniCard({ title, value, subValue, icon, accent }) {
   );
 }
 
-function FileUploader({ title, helper, templateKey, requiredColumns, onUpload, onRemove, rowsCount }) {
+function UpgradeOptions({ checkingOutPlan, onCheckout }) {
+  const plans = [
+    { key: "STARTER", name: "Starter", price: "Rs. 799/mo", detail: "10 reports, 5,000 rows, exports, advanced AI" },
+    { key: "GROWTH", name: "Growth", price: "Rs. 1,999/mo", detail: "50 reports, 25,000 rows, exports, advanced AI" },
+    { key: "PRO", name: "Pro", price: "Rs. 4,999/mo", detail: "Unlimited reports, 100,000 rows, exports, advanced AI" }
+  ];
+
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      {plans.map((plan) => (
+        <div key={plan.key} className="rounded-[24px] bg-white p-5 shadow-sm ring-1 ring-black/5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
+              <p className="mt-1 text-2xl font-bold text-emerald-700">{plan.price}</p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">Paid</span>
+          </div>
+          <p className="mt-3 min-h-[40px] text-sm text-slate-500">{plan.detail}</p>
+          <button
+            type="button"
+            onClick={() => onCheckout(plan.key)}
+            disabled={checkingOutPlan === plan.key}
+            className="mt-4 w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+          >
+            {checkingOutPlan === plan.key ? "Opening checkout..." : `Upgrade to ${plan.name}`}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FileUploader({ title, helper, templateKey, requiredColumns, onUpload, onRemove, rowsCount, currentTotalRows, maxRows }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [fileName, setFileName] = useState("");
@@ -1230,6 +1457,11 @@ if (!parsed.length) {
 }
 
 const mappedRows = autoMapCsvRows(parsed, requiredColumns);
+const nextTotalRows = Number(currentTotalRows || 0) - Number(rowsCount || 0) + mappedRows.length;
+
+if (nextTotalRows > Number(maxRows || 0)) {
+  throw new Error(`This upload would use ${nextTotalRows} CSV rows. Your plan allows up to ${maxRows} rows.`);
+}
 
 const availableColumns = Object.keys(mappedRows[0] || {});
 const missing = requiredColumns.filter(
@@ -1354,18 +1586,34 @@ function TableCard({ products, settings }) {
   );
 }
 
-function InsightCard({ title, suggestions }) {
+function InsightCard({ title, suggestions, planIsPaid, aiLoading, onGenerateAdvanced }) {
   return (
     <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
       <CardContent className="p-6">
-        <div className="mb-4 flex items-center gap-2">
-          <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700">
-            <Brain className="h-5 w-5" />
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div className="flex gap-2">
+            <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700">
+              <Brain className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-slate-900">{title}</h2>
+              <p className="text-sm text-slate-500">
+                {planIsPaid ? "Advanced AI can generate deeper actions for this report." : "Free plan shows simple rule-based suggestions."}
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">{title}</h2>
-            <p className="text-sm text-slate-500">Rule-based MVP suggestions</p>
-          </div>
+          <button
+            type="button"
+            onClick={onGenerateAdvanced}
+            disabled={aiLoading}
+            className={`rounded-2xl px-3 py-2 text-xs font-semibold transition ${
+              planIsPaid
+                ? "bg-slate-900 text-white hover:bg-slate-800"
+                : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+            }`}
+          >
+            {aiLoading ? "Generating..." : planIsPaid ? "Generate AI" : "Upgrade for AI"}
+          </button>
         </div>
         <div className="space-y-3 max-h-[32rem] overflow-auto pr-1">
           {suggestions.map((item, index) => (
