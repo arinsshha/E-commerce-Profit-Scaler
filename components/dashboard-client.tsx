@@ -527,15 +527,6 @@ function ComparisonTile({ label, value, positive }) {
   );
 }
 
-function BillingRow({ label, value }) {
-  return (
-    <div className="rounded-2xl bg-slate-50 p-3">
-      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-bold text-slate-900">{value}</p>
-    </div>
-  );
-}
-
 function FileUploader({ title, helper, templateKey, requiredColumns, onUpload, onRemove, rowsCount, currentTotalRows, maxRows }) {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -665,6 +656,8 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
   const [reports, setReports] = useState(initialReports || []);
   const [saving, setSaving] = useState(false);
   const [openingReportId, setOpeningReportId] = useState("");
+  const [deletingReportId, setDeletingReportId] = useState("");
+  const [currentReportId, setCurrentReportId] = useState("");
   const [exporting, setExporting] = useState("");
   const [advancedSuggestions, setAdvancedSuggestions] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -927,18 +920,22 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
   ], [workspaceMode, orders.length, costs.length, shipping.length, ads.length, reports.length]);
 
   const reportComparison = useMemo(() => {
-    const previous = reports.find((report) => report?.analysis?.totals)?.analysis?.totals;
+    const comparisonReport = reports.find(
+      (report) => report?.analysis?.totals && (report.id || report.title) !== currentReportId
+    );
+    const previous = comparisonReport?.analysis?.totals;
     if (!previous) return null;
 
     return {
+      reportTitle: comparisonReport?.title || "Last saved report",
       revenueDelta: Number(analysis.totals.revenue || 0) - Number(previous.revenue || 0),
       profitDelta: Number(analysis.totals.realProfit || 0) - Number(previous.realProfit || 0),
       marginDelta: Number(analysis.totals.margin || 0) - Number(previous.margin || 0),
       newLossMakers: analysis.lossMaking.filter(
-        (product) => !(reports[0]?.analysis?.lossMaking || []).some((oldProduct) => oldProduct.sku === product.sku)
+        (product) => !(comparisonReport?.analysis?.lossMaking || []).some((oldProduct) => oldProduct.sku === product.sku)
       ).length
     };
-  }, [analysis, reports]);
+  }, [analysis, currentReportId, reports]);
 
   const suggestions = useMemo(() => {
     const result = [];
@@ -1049,6 +1046,7 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
     setConsultantNotes("");
     setWorkspaceMode("demo");
     setUploadPreset("custom");
+    setCurrentReportId("");
     setSimulator({
       priceChange: 0,
       adSpendChange: 0,
@@ -1070,13 +1068,14 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
     setClientName("");
     setConsultantNotes("");
     setWorkspaceMode("live");
+    setCurrentReportId("");
   };
 
   const applyPreset = (preset) => {
     setUploadPreset(preset);
     if (preset === "shopify") setStoreName(storeName || "Shopify Store");
     if (preset === "woocommerce") setStoreName(storeName || "WooCommerce Store");
-    if (preset === "amazon") setStoreName(storeName || "Marketplace Store");
+    if (preset === "marketplace") setStoreName(storeName || "Marketplace Store");
   };
 
   const downloadMissingCosts = () => {
@@ -1259,6 +1258,7 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
       if (!response.ok) throw new Error(data.error || "Failed to save report");
 
       setReports((current) => [data.report, ...current]);
+      setCurrentReportId(data.report.id || data.report.title || "");
       alert("Report saved successfully.");
     } catch (error) {
       alert(error?.message || "Could not save report.");
@@ -1294,6 +1294,11 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
       setShipping(fullReport.shipping || []);
       setReturns(fullReport.returns || []);
       setSettings({ ...defaultSettings, ...(fullReport.settings || {}) });
+      setStoreName(fullReport.settings?.storeName || fullReport.title || "");
+      setClientName(fullReport.settings?.clientName || "");
+      setConsultantNotes(fullReport.settings?.consultantNotes || "");
+      setWorkspaceMode("live");
+      setCurrentReportId(fullReport.id || fullReport.title || "");
       setSearchTerm("");
       setSortBy("realProfit");
 
@@ -1302,6 +1307,37 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
       alert(error?.message || "Could not open report.");
     } finally {
       setOpeningReportId("");
+    }
+  };
+
+  const deleteSavedReport = async (report) => {
+    const reportKey = report.id || report.title || "";
+    if (!report?.id) {
+      setReports((current) => current.filter((item) => (item.id || item.title) !== reportKey));
+      if (currentReportId === reportKey) setCurrentReportId("");
+      return;
+    }
+
+    const confirmed = window.confirm(`Delete "${report.title}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeletingReportId(reportKey);
+    try {
+      const response = await fetch(`/api/reports/${report.id}`, {
+        method: "DELETE"
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Could not delete report.");
+      }
+
+      setReports((current) => current.filter((item) => item.id !== report.id));
+      if (currentReportId === reportKey) setCurrentReportId("");
+    } catch (error) {
+      alert(error?.message || "Could not delete report.");
+    } finally {
+      setDeletingReportId("");
     }
   };
 
@@ -1851,7 +1887,7 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
           </Card>
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-2">
+        <section>
           <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
             <CardContent className="p-6">
               <div className="mb-5 flex items-center gap-2">
@@ -1861,6 +1897,9 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
                 <div>
                   <p className="text-sm font-medium text-slate-500">Report Comparison</p>
                   <h2 className="text-xl font-bold text-slate-900">Current vs Last Saved Report</h2>
+                  {reportComparison?.reportTitle && (
+                    <p className="mt-1 text-sm text-slate-500">Comparing against: {reportComparison.reportTitle}</p>
+                  )}
                 </div>
               </div>
               {reportComparison ? (
@@ -1873,34 +1912,6 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
               ) : (
                 <div className="rounded-3xl bg-slate-50 p-5 text-sm text-slate-600">
                   Save a report first, then compare future uploads against it.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-[28px] border-0 bg-white shadow-sm ring-1 ring-black/5">
-            <CardContent className="p-6">
-              <div className="mb-5 flex items-center gap-2">
-                <div className="rounded-2xl bg-emerald-100 p-2 text-emerald-700">
-                  <ReceiptIndianRupee className="h-5 w-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-slate-500">Plan / Billing</p>
-                  <h2 className="text-xl font-bold text-slate-900">{planConfig.name} Plan</h2>
-                </div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                <BillingRow label="Reports used" value={reportLimitLabel} />
-                <BillingRow label="CSV rows used" value={csvLimitLabel} />
-                <BillingRow label="Exports" value={planConfig.canExport ? "Unlocked" : "Upgrade required"} />
-                <BillingRow label="AI level" value={planConfig.aiLevel === "advanced" ? "Advanced" : "Simple"} />
-              </div>
-              <p className="mt-4 rounded-2xl bg-slate-50 p-3 text-sm text-slate-600">
-                Admin-granted plans appear here as the active plan. Upgrade, cancel, and payment management can be connected to the billing provider.
-              </p>
-              {!planIsPaid && (
-                <div className="mt-4">
-                  <UpgradeOptions checkingOutPlan={checkingOutPlan} onCheckout={startStripeCheckout} />
                 </div>
               )}
             </CardContent>
@@ -1922,12 +1933,13 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
               ) : (
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                   {reports.map((report) => (
-                    <button
+                    <div
                       key={report.id || report.title}
-                      type="button"
-                      onClick={() => openSavedReport(report)}
-                      disabled={openingReportId === (report.id || report.title)}
-                      className="rounded-3xl border border-slate-100 bg-slate-50 p-4 text-left transition hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      className={`rounded-3xl border p-4 transition ${
+                        currentReportId === (report.id || report.title)
+                          ? "border-emerald-200 bg-emerald-50"
+                          : "border-slate-100 bg-slate-50"
+                      }`}
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -1935,15 +1947,34 @@ export function DashboardClient({ initialReports = [], userPlan = "FREE", report
                           <p className="mt-1 text-sm text-slate-500">
                             {report.createdAt ? new Date(report.createdAt).toLocaleString() : "Saved locally"}
                           </p>
-                          <p className="mt-3 text-xs font-semibold text-emerald-700">
-                            {openingReportId === (report.id || report.title) ? "Opening..." : "Open report"}
-                          </p>
+                          {currentReportId === (report.id || report.title) && (
+                            <p className="mt-2 text-xs font-semibold text-emerald-700">Currently open</p>
+                          )}
                         </div>
                         <div className="rounded-2xl bg-white p-2 text-slate-500">
                           <FileText className="h-4 w-4" />
                         </div>
                       </div>
-                    </button>
+                      <div className="mt-4 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openSavedReport(report)}
+                          disabled={openingReportId === (report.id || report.title)}
+                          className="flex-1 rounded-2xl bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                        >
+                          {openingReportId === (report.id || report.title) ? "Opening..." : "Open"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteSavedReport(report)}
+                          disabled={deletingReportId === (report.id || report.title)}
+                          className="inline-flex items-center justify-center rounded-2xl border border-red-100 bg-white px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:opacity-60"
+                        >
+                          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                          {deletingReportId === (report.id || report.title) ? "Deleting..." : "Delete"}
+                        </button>
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
